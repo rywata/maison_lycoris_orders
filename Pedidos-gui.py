@@ -4,6 +4,38 @@ from datetime import datetime
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
+# --- 0. SEGURANÇA (LOGIN) ---
+def check_password():
+    """Retorna True se o usuário digitou a senha correta."""
+    def password_entered():
+        if st.session_state["password"] == st.secrets["credentials"]["usernames"].get(st.session_state["username"]):
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]
+            del st.session_state["username"]
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        # Tela de Login
+        st.title("🔐 Acesso Restrito - Maison Lycoris")
+        st.text_input("Usuário", key="username")
+        st.text_input("Senha", type="password", key="password")
+        st.button("Entrar", on_click=password_entered)
+        return False
+    elif not st.session_state["password_correct"]:
+        # Senha incorreta
+        st.title("🔐 Acesso Restrito - Maison Lycoris")
+        st.text_input("Usuário", key="username")
+        st.text_input("Senha", type="password", key="password")
+        st.button("Entrar", on_click=password_entered)
+        st.error("😕 Usuário ou senha incorretos.")
+        return False
+    else:
+        return True
+
+if not check_password():
+    st.stop()
+
 # --- 1. CONFIGURAÇÃO DO GOOGLE SHEETS ---
 @st.cache_resource
 def conectar_google():
