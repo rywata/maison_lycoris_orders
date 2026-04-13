@@ -39,17 +39,20 @@ if not check_password():
 # --- 1. CONFIGURAÇÃO DO GOOGLE SHEETS ---
 @st.cache_resource
 def conectar_google():
-    # 1. Carrega os dados
-    info = dict(st.secrets["gcp_service_account"])
-    raw_key = info["private_key"].strip()
-    info["private_key"] = raw_key.replace("\\n", "\n")
-    
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    
     try:
+        info = dict(st.secrets["gcp_service_account"])
+        raw_key = info["private_key"].strip()
+        lines = [line.strip() for line in raw_key.split('\n')]
+        clean_key = '\n'.join(lines)
+        info["private_key"] = clean_key.replace("\\n", "\n")
+        
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        
         creds = ServiceAccountCredentials.from_json_keyfile_dict(info, scope)
         client = gspread.authorize(creds)
+        
         return client.open("Controle").worksheet("Pedidos")
+        
     except Exception as e:
         st.error(f"Erro de conexão detalhado: {e}")
         return None
