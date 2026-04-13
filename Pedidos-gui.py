@@ -40,8 +40,8 @@ if not check_password():
 @st.cache_resource
 def conectar_google():
     info = dict(st.secrets["gcp_service_account"])
-
-    info["private_key"] = info["private_key"].replace("\\n", "\n")
+    if "\\n" in info["private_key"]:
+        info["private_key"] = info["private_key"].replace("\\n", "\n")
     
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     
