@@ -8,12 +8,15 @@ from oauth2client.service_account import ServiceAccountCredentials
 @st.cache_resource
 def conectar_google():
     info = dict(st.secrets["gcp_service_account"])
-    info["private_key"] = info["private_key"].replace("\\n", "\n")
-    
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(info, scope)
-    client = gspread.authorize(creds)
-    return client.open("Controle").worksheet("Pedidos")
+    
+    try:
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(info, scope)
+        client = gspread.authorize(creds)
+        return client.open("Controle").worksheet("Pedidos")
+    except Exception as e:
+        st.error(f"Erro de conexão: {e}")
+        return None
 
 try:
     aba_pedidos = conectar_google()
