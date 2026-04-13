@@ -7,9 +7,11 @@ from oauth2client.service_account import ServiceAccountCredentials
 # --- 1. CONFIGURAÇÃO DO GOOGLE SHEETS ---
 @st.cache_resource
 def conectar_google():
-    credentials_info = st.secrets["gcp_service_account"]
+    info = dict(st.secrets["gcp_service_account"])
+    info["private_key"] = info["private_key"].replace("\\n", "\n")
+    
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials_info, scope)
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(info, scope)
     client = gspread.authorize(creds)
     return client.open("Controle").worksheet("Pedidos")
 
