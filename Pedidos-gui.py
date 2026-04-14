@@ -14,14 +14,15 @@ def check_password():
             del st.session_state["username"]
         else:
             st.session_state["password_correct"] = False
-
+            
     if "password_correct" not in st.session_state:
-        # Tela de Login
         st.title("🔐 Acesso Restrito - Maison Lycoris")
-        st.text_input("Usuário", key="username")
-        st.text_input("Senha", type="password", key="password")
+        st.text_input("Usuário", key="username", autocomplete="username")
+        st.text_input("Senha", type="password", key="password", autocomplete="current-password")
         st.button("Entrar", on_click=password_entered)
         return False
+
+    
     elif not st.session_state["password_correct"]:
         # Senha incorreta
         st.title("🔐 Acesso Restrito - Maison Lycoris")
