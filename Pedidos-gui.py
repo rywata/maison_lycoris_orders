@@ -6,17 +6,40 @@ from oauth2client.service_account import ServiceAccountCredentials
 import requests
 from streamlit_lottie import st_lottie
 
-# --- FUNÇÃO PARA ANIMAÇÃO LOTTIE ---
-def load_lottieurl(url: str):
-    r = requests.get(url)
-    if r.status_code != 200:
-        return None
-    return r.json()
-
-# Carrega o ícone de check animado
-lottie_success_check = load_lottieurl("https://fonts.gstatic.com/s/i/short-term/release/googlestyles/check_circle/default/24px.svg")
-lottie_url = "https://assets10.lottiefiles.com/packages/lf20_awSSTt.json"
-lottie_json = load_lottieurl(lottie_url)
+# --- 0. ANIMAÇÃO LOTTIE INCORPORADA ---
+# JSON de um check verde minimalista para garantir carregamento instantâneo e offline
+lottie_check_json = json.loads("""
+{
+  "v": "5.5.7", "fr": 60, "ip": 0, "op": 60, "w": 100, "h": 100, "nm": "Check", "ddd": 0,
+  "assets": [], "comps": [],
+  "layers": [{
+    "ddd": 0, "ind": 1, "ty": 4, "nm": "Shape", "sr": 1,
+    "ks": {
+      "o": {"a": 0, "k": 100}, "r": {"a": 0, "k": 0}, "p": {"a": 0, "k": [50, 50, 0]},
+      "a": {"a": 0, "k": [0, 0, 0]}, "s": {"a": 0, "k": [100, 100, 100]}
+    },
+    "shapes": [{
+      "ty": "gr", "it": [
+        {
+          "ind": 0, "ty": "sh", "ix": 1,
+          "ks": {
+            "a": 1,
+            "k": [
+              {"i": {"x": [0.667], "y": [1]}, "o": {"x": [0.333], "y": [0]}, "t": 0, "s": [{"i": [[0, 0], [0, 0], [0, 0]], "o": [[0, 0], [0, 0], [0, 0]], "v": [[-26, 4], [-26, 4], [-26, 4]], "c": false}]},
+              {"i": {"x": [0.667], "y": [1]}, "o": {"x": [0.333], "y": [0]}, "t": 20, "s": [{"i": [[0, 0], [0, 0], [0, 0]], "o": [[0, 0], [0, 0], [0, 0]], "v": [[-26, 4], [-9, 21], [-9, 21]], "c": false}]},
+              {"t": 35, "s": [{"i": [[0, 0], [0, 0], [0, 0]], "o": [[0, 0], [0, 0], [0, 0]], "v": [[-26, 4], [-9, 21], [27, -17]], "c": false}]}
+            ]
+          }
+        },
+        {
+          "ty": "st", "c": {"a": 0, "k": [0.15, 0.65, 0.27, 1]},
+          "o": {"a": 0, "k": 100}, "w": {"a": 0, "k": 8}, "lc": 2, "lj": 2
+        }
+      ]
+    }]
+  }]
+}
+""")
 
 # --- 0. SEGURANÇA (LOGIN) ---
 def check_password():
