@@ -3,43 +3,40 @@ import pandas as pd
 from datetime import datetime
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import requests
 from streamlit_lottie import st_lottie
 
-# --- 0. ANIMAÇÃO LOTTIE INCORPORADA ---
-# JSON de um check verde minimalista para garantir carregamento instantâneo e offline
-lottie_check_json = json.loads("""
-{
-  "v": "5.5.7", "fr": 60, "ip": 0, "op": 60, "w": 100, "h": 100, "nm": "Check", "ddd": 0,
-  "assets": [], "comps": [],
-  "layers": [{
-    "ddd": 0, "ind": 1, "ty": 4, "nm": "Shape", "sr": 1,
-    "ks": {
-      "o": {"a": 0, "k": 100}, "r": {"a": 0, "k": 0}, "p": {"a": 0, "k": [50, 50, 0]},
-      "a": {"a": 0, "k": [0, 0, 0]}, "s": {"a": 0, "k": [100, 100, 100]}
-    },
-    "shapes": [{
-      "ty": "gr", "it": [
-        {
-          "ind": 0, "ty": "sh", "ix": 1,
-          "ks": {
-            "a": 1,
-            "k": [
-              {"i": {"x": [0.667], "y": [1]}, "o": {"x": [0.333], "y": [0]}, "t": 0, "s": [{"i": [[0, 0], [0, 0], [0, 0]], "o": [[0, 0], [0, 0], [0, 0]], "v": [[-26, 4], [-26, 4], [-26, 4]], "c": false}]},
-              {"i": {"x": [0.667], "y": [1]}, "o": {"x": [0.333], "y": [0]}, "t": 20, "s": [{"i": [[0, 0], [0, 0], [0, 0]], "o": [[0, 0], [0, 0], [0, 0]], "v": [[-26, 4], [-9, 21], [-9, 21]], "c": false}]},
-              {"t": 35, "s": [{"i": [[0, 0], [0, 0], [0, 0]], "o": [[0, 0], [0, 0], [0, 0]], "v": [[-26, 4], [-9, 21], [27, -17]], "c": false}]}
-            ]
-          }
+# --- 0. ANIMAÇÃO LOTTIE INCORPORADA (DICIONÁRIO PYTHON) ---
+# Removi o json.loads para evitar o NameError. Agora é um objeto nativo.
+lottie_check_json = {
+    "v": "5.5.7", "fr": 60, "ip": 0, "op": 60, "w": 100, "h": 100, "nm": "Check", "ddd": 0,
+    "assets": [], "comps": [],
+    "layers": [{
+        "ddd": 0, "ind": 1, "ty": 4, "nm": "Shape", "sr": 1,
+        "ks": {
+            "o": {"a": 0, "k": 100}, "r": {"a": 0, "k": 0}, "p": {"a": 0, "k": [50, 50, 0]},
+            "a": {"a": 0, "k": [0, 0, 0]}, "s": {"a": 0, "k": [100, 100, 100]}
         },
-        {
-          "ty": "st", "c": {"a": 0, "k": [0.15, 0.65, 0.27, 1]},
-          "o": {"a": 0, "k": 100}, "w": {"a": 0, "k": 8}, "lc": 2, "lj": 2
-        }
-      ]
+        "shapes": [{
+            "ty": "gr", "it": [
+                {
+                    "ind": 0, "ty": "sh", "ix": 1,
+                    "ks": {
+                        "a": 1,
+                        "k": [
+                            {"i": {"x": [0.667], "y": [1]}, "o": {"x": [0.333], "y": [0]}, "t": 0, "s": [{"i": [[0, 0], [0, 0], [0, 0]], "o": [[0, 0], [0, 0], [0, 0]], "v": [[-26, 4], [-26, 4], [-26, 4]], "c": False}]},
+                            {"i": {"x": [0.667], "y": [1]}, "o": {"x": [0.333], "y": [0]}, "t": 20, "s": [{"i": [[0, 0], [0, 0], [0, 0]], "o": [[0, 0], [0, 0], [0, 0]], "v": [[-26, 4], [-9, 21], [-9, 21]], "c": False}]},
+                            {"t": 35, "s": [{"i": [[0, 0], [0, 0], [0, 0]], "o": [[0, 0], [0, 0], [0, 0]], "v": [[-26, 4], [-9, 21], [27, -17]], "c": False}]}
+                        ]
+                    }
+                },
+                {
+                    "ty": "st", "c": {"a": 0, "k": [0.15, 0.65, 0.27, 1]},
+                    "o": {"a": 0, "k": 100}, "w": {"a": 0, "k": 8}, "lc": 2, "lj": 2
+                }
+            ]
+        }]
     }]
-  }]
 }
-""")
 
 # --- 0. SEGURANÇA (LOGIN) ---
 def check_password():
