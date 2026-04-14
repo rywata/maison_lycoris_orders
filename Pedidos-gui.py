@@ -103,7 +103,12 @@ with st.container():
     with col1:
         nome_cliente = st.text_input("Nome do Cliente", placeholder="Ex: Zé Bedeu")
     with col2:
-        data_entrega = st.text_input("Data de Entrega", placeholder="Ex: 15/04")
+        data_selecionada = st.date_input(
+            "Data de Entrega", 
+            value=datetime.now(),
+            format="DD/MM/YYYY" 
+        )
+        data_entrega = data_selecionada.strftime("%d/%m/%Y")
 
 st.divider()
 
