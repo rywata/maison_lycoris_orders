@@ -1,4 +1,6 @@
 streamlit
+pandas
 gspread
 oauth2client
-pandas
+streamlit-lottie
+requests
