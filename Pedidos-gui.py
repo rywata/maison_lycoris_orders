@@ -3,6 +3,20 @@ import pandas as pd
 from datetime import datetime
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import requests
+from streamlit_lottie import st_lottie
+
+# --- FUNÇÃO PARA ANIMAÇÃO LOTTIE ---
+def load_lottieurl(url: str):
+    r = requests.get(url)
+    if r.status_code != 200:
+        return None
+    return r.json()
+
+# Carrega o ícone de check animado
+lottie_success_check = load_lottieurl("https://fonts.gstatic.com/s/i/short-term/release/googlestyles/check_circle/default/24px.svg")
+lottie_url = "https://assets10.lottiefiles.com/packages/lf20_awSSTt.json"
+lottie_json = load_lottieurl(lottie_url)
 
 # --- 0. SEGURANÇA (LOGIN) ---
 def check_password():
@@ -21,10 +35,8 @@ def check_password():
         st.text_input("Senha", type="password", key="password", autocomplete="current-password")
         st.button("Entrar", on_click=password_entered)
         return False
-
     
     elif not st.session_state["password_correct"]:
-        # Senha incorreta
         st.title("🔐 Acesso Restrito - Maison Lycoris")
         st.text_input("Usuário", key="username")
         st.text_input("Senha", type="password", key="password")
@@ -48,7 +60,6 @@ def conectar_google():
         info["private_key"] = clean_key.replace("\\n", "\n")
         
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        
         creds = ServiceAccountCredentials.from_json_keyfile_dict(info, scope)
         client = gspread.authorize(creds)
         
@@ -85,17 +96,26 @@ codigo_pasteis = ["Pastel de Nata", "Pastel de Maçã", "Pastel de Ricota com Er
 
 # --- 4. INTERFACE VISUAL ---
 st.set_page_config(page_title="Maison Lycoris - Pedidos", page_icon="🥐")
-st.title("🥐 Maison Lycoris - Sistema de Pedidos")
 
-# Se o pedido foi enviado, mostra tela de sucesso
+# TELA DE SUCESSO PÓS-ENVIO
 if st.session_state.pedido_enviado:
-    st.balloons()
-    st.success("✅ Pedido enviado com sucesso para o Google Sheets!")
-    if st.button("Novo Pedido"):
+    st.markdown("<br>", unsafe_allow_html=True)
+    # Exibe a animação do Check
+    if lottie_json:
+        st_lottie(lottie_json, height=200, key="success_check", speed=1, loop=False)
+    else:
+        st.title("✔️") # Fallback caso o link do Lottie falhe
+    
+    st.markdown("<h2 style='text-align: center;'>Pedido Confirmado!</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'>Os dados já estão na planilha da Maison Lycoris.</p>", unsafe_allow_html=True)
+    
+    if st.button("Criar Novo Pedido", use_container_width=True):
         st.session_state.carrinho = []
         st.session_state.pedido_enviado = False
         st.rerun()
     st.stop()
+
+st.title("🥐 Maison Lycoris - Sistema de Pedidos")
 
 # Coleta de dados do cliente
 with st.container():
@@ -141,24 +161,16 @@ if st.session_state.carrinho:
     st.subheader("📝 Resumo da Encomenda")
     
     df = pd.DataFrame(st.session_state.carrinho)
-    
     total_unidades_pasteis = sum(item['qtd'] for item in st.session_state.carrinho if item['produto'] in codigo_pasteis)
     tem_desconto = total_unidades_pasteis >= 4
     
-    # Mostra os itens
     for i, item in df.iterrows():
-        # Cálculo de desconto visual
-        desc_visual = 0.0
-        if tem_desconto and item['produto'] in codigo_pasteis:
-            desc_visual = item['subtotal'] * 0.15
-        
         st.write(f"**{item['qtd']}x {item['produto']}** - R$ {item['subtotal']:.2f}")
 
     total_bruto = df['subtotal'].sum()
     total_desconto = sum(item['subtotal'] * 0.15 for item in st.session_state.carrinho if tem_desconto and item['produto'] in codigo_pasteis)
     total_final = total_bruto - total_desconto
 
-    # Exibição dos totais
     st.divider()
     if total_desconto > 0:
         st.write(f"Subtotal Bruto: R$ {total_bruto:.2f}")
@@ -176,7 +188,6 @@ if st.session_state.carrinho:
             desc_i = (item['subtotal'] * 0.15) if (tem_desconto and item['produto'] in codigo_pasteis) else 0.0
             liq_i = item['subtotal'] - desc_i
             
-            # Formato da Planilha: [ID, Cliente, Entrega, Produto, Qtd, Bruto, Desconto, Líquido, Data Entrada]
             dados_finais.append([
                 id_pedido, nome_cliente, data_entrega, item['produto'], 
                 item['qtd'], item['subtotal'], desc_i, liq_i, data_entrada
