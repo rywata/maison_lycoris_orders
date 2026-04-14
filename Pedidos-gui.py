@@ -120,11 +120,16 @@ st.set_page_config(page_title="Maison Lycoris - Pedidos", page_icon="🥐")
 # TELA DE SUCESSO PÓS-ENVIO
 if st.session_state.pedido_enviado:
     st.markdown("<br>", unsafe_allow_html=True)
-    # Exibe a animação do Check
-    if lottie_json:
-        st_lottie(lottie_json, height=200, key="success_check", speed=1, loop=False)
-    else:
-        st.title("✔️") # Fallback caso o link do Lottie falhe
+    c1, c2, c3 = st.columns([1, 2, 1])
+    with c2:
+        # Aqui o nome deve bater com a variável definida no topo!
+        st_lottie(
+            lottie_check_json, 
+            height=200, 
+            speed=1.2, 
+            loop=False, 
+            key="success_lottie"
+        )
     
     st.markdown("<h2 style='text-align: center;'>Pedido Confirmado!</h2>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center;'>Os dados já estão na planilha da Maison Lycoris.</p>", unsafe_allow_html=True)
