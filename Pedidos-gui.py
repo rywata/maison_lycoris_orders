@@ -141,10 +141,10 @@ if st.session_state.carrinho:
         dados = []
         for item in st.session_state.carrinho:
             d_i = (item['subtotal'] * 0.15) if (tem_desc and item['produto'] in codigo_pasteis) else 0.0
-            dados.append([id_p, nome_cliente, data_entrega, item['produto'], item['qtd'], item['subtotal'], d_i, item['subtotal']-d_i, dt_in])
+            dados.append([id_p, nome_cliente, data_sel.isoformat(), item['produto'], item['qtd'], item['subtotal'], d_i, item['subtotal']-d_i, datetime.now().isoformat()])
         
         try:
-            aba_pedidos.append_rows(dados)
+            aba_pedidos.append_rows(dados, value_input_option='USER_ENTERED')
             st.session_state.pedido_enviado = True
             st.rerun()
         except Exception as e:
