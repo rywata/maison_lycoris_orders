@@ -136,16 +136,29 @@ if st.session_state.carrinho:
     st.metric("Total a Pagar", f"R$ {total_bruto - total_desc:.2f}")
 
     if st.button("🚀 FINALIZAR E ENVIAR PEDIDO", use_container_width=True):
-        id_p = datetime.now().strftime("%Y%m%d%H%M")
-        dt_in = datetime.now().strftime("%d/%m/%Y %H:%M")
-        dados = []
-        for item in st.session_state.carrinho:
-            d_i = (item['subtotal'] * 0.15) if (tem_desc and item['produto'] in codigo_pasteis) else 0.0
-            dados.append([id_p, nome_cliente, data_sel.isoformat(), item['produto'], item['qtd'], item['subtotal'], d_i, item['subtotal']-d_i, datetime.now().isoformat()])
-        
-        try:
-            aba_pedidos.append_rows(dados, value_input_option='USER_ENTERED')
-            st.session_state.pedido_enviado = True
-            st.rerun()
-        except Exception as e:
-            st.error(f"Erro ao salvar: {e}")
+            id_p = datetime.now().strftime("%Y%m%d%H%M")
+            dt_in = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            dados = []
+            for item in st.session_state.carrinho:
+                d_i = float((item['subtotal'] * 0.15) if (tem_desc and item['produto'] in codigo_pasteis) else 0.0)
+                bruto = float(item['subtotal'])
+                liquido = float(bruto - d_i)
+                
+                dados.append([
+                    id_p, 
+                    nome_cliente, 
+                    data_sel.isoformat(), 
+                    item['produto'], 
+                    int(item['qtd']), 
+                    bruto, 
+                    d_i, 
+                    liquido, 
+                    dt_in
+                ])
+            
+            try:
+                aba_pedidos.append_rows(dados, value_input_option='USER_ENTERED')
+                st.session_state.pedido_enviado = True
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao salvar: {e}")
