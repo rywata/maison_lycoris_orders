@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from logic import Carrinho
+from database import Database, salvar_pedido
 
 # --- 0. SEGURANÇA (LOGIN) ---
 def check_password():
@@ -32,26 +32,16 @@ def check_password():
 if not check_password():
     st.stop()
 
-# --- 1. CONFIGURAÇÃO GOOGLE SHEETS ---
+# --- 1. CONFIGURAÇÃO GOOGLE SHEETS (Via Database) ---
 @st.cache_resource
-def conectar_google():
-    try:
-        info = dict(st.secrets["gcp_service_account"])
-        raw_key = info["private_key"].strip()
-        lines = [line.strip() for line in raw_key.split('\n')]
-        info["private_key"] = '\n'.join(lines).replace("\\n", "\n")
-        
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(info, scope)
-        client = gspread.authorize(creds)
-        return client.open("Controle").worksheet("Pedidos")
-    except Exception as e:
-        st.error(f"Erro de conexão: {e}")
-        return None
+def iniciar_conexao():
+    db = Database() 
+    return db.conectar_aba("Controle", "Pedidos")
 
 try:
-    aba_pedidos = conectar_google()
-except:
+    aba_pedidos = iniciar_conexao()
+except Exception as e:
+    st.error(f"Erro de conexão: {e}")
     st.stop()
 
 # --- 2. ESTADO E DADOS ---
@@ -67,10 +57,8 @@ codigo_pasteis = [k for k in cardapio.keys() if "Pastel" in k]
 # --- 3. INTERFACE ---
 st.set_page_config(page_title="Maison Lycoris - Pedidos", page_icon="🥐", layout="centered")
 
-# TELA DE SUCESSO (Check Estático)
 if st.session_state.pedido_enviado:
     st.markdown("<br><br>", unsafe_allow_html=True)
-    # Check Verde Gigante Centralizado
     st.markdown("""
         <div style="text-align: center;">
             <span style="color: #28a745; font-size: 120px; font-weight: bold;">✓</span>
@@ -92,9 +80,7 @@ with st.container():
     with col1:
         nome_cliente = st.text_input("Nome do Cliente", placeholder="Ex: Zé Bedeu")
     with col2:
-        # Seletor de data conforme solicitado
         data_sel = st.date_input("Data de Entrega", value=datetime.now(), format="DD/MM/YYYY")
-        data_entrega = data_sel.strftime("%d/%m/%Y")
 
 st.divider()
 st.subheader("Adicionar Produtos")
@@ -115,50 +101,46 @@ with c_add:
         else:
             st.warning("Preencha o nome do cliente!")
 
-# --- 4. CARRINHO ---
+# --- 4. CARRINHO (Via Logic) ---
 if st.session_state.carrinho:
     st.divider()
-    df = pd.DataFrame(st.session_state.carrinho)
-    total_pasteis = sum(item['qtd'] for item in st.session_state.carrinho if item['produto'] in codigo_pasteis)
-    tem_desc = total_pasteis >= 4
     
-    for item in st.session_state.carrinho:
+    meu_carrinho = Carrinho(st.session_state.carrinho, codigo_pasteis)
+    
+    for item in meu_carrinho.itens:
         st.write(f"**{item['qtd']}x {item['produto']}** - R$ {item['subtotal']:.2f}")
 
-    total_bruto = df['subtotal'].sum()
-    # Aplicando o desconto de 15% para o combo de 4 ou mais pastéis
-    total_desc = sum(item['subtotal'] * 0.15 for item in st.session_state.carrinho if tem_desc and item['produto'] in codigo_pasteis)
-    
     st.divider()
-    if total_desc > 0:
-        st.write(f"Subtotal Bruto: R$ {total_bruto:.2f}")
-        st.write(f"🎁 Desconto Combo: -R$ {total_desc:.2f}")
-    st.metric("Total a Pagar", f"R$ {total_bruto - total_desc:.2f}")
+    if meu_carrinho.desconto_total > 0:
+        st.write(f"Subtotal Bruto: R$ {meu_carrinho.total_bruto:.2f}")
+        st.write(f"🎁 Desconto Combo: -R$ {meu_carrinho.desconto_total:.2f}")
+    
+    st.metric("Total a Pagar", f"R$ {meu_carrinho.total_final:.2f}")
 
+    # --- 5. FINALIZAÇÃO ---
     if st.button("🚀 FINALIZAR E ENVIAR PEDIDO", use_container_width=True):
-            id_p = datetime.now().strftime("%Y%m%d%H%M")
-            dt_in = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            dados = []
-            for item in st.session_state.carrinho:
-                d_i = float((item['subtotal'] * 0.15) if (tem_desc and item['produto'] in codigo_pasteis) else 0.0)
-                bruto = float(item['subtotal'])
-                liquido = float(bruto - d_i)
-                
-                dados.append([
-                    id_p, 
-                    nome_cliente, 
-                    data_sel.isoformat(), 
-                    item['produto'], 
-                    int(item['qtd']), 
-                    bruto, 
-                    d_i, 
-                    liquido, 
-                    dt_in
-                ])
+        id_p = datetime.now().strftime("%Y%m%d%H%M")
+        dt_in = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        dados_para_planilha = []
+        for item in meu_carrinho.itens:
+            d_i = float((item['subtotal'] * 0.15) if (meu_carrinho.tem_desconto and item['produto'] in codigo_pasteis) else 0.0)
+            bruto = float(item['subtotal'])
             
-            try:
-                aba_pedidos.append_rows(dados, value_input_option='USER_ENTERED')
-                st.session_state.pedido_enviado = True
-                st.rerun()
-            except Exception as e:
-                st.error(f"Erro ao salvar: {e}")
+            dados_para_planilha.append([
+                id_p, 
+                nome_cliente, 
+                data_sel.isoformat(), 
+                item['produto'], 
+                int(item['qtd']), 
+                bruto, 
+                d_i, 
+                float(bruto - d_i), 
+                dt_in
+            ])
+        
+        if salvar_pedido(aba_pedidos, dados_para_planilha):
+            st.session_state.pedido_enviado = True
+            st.rerun()
+        else:
+            st.error("Erro ao salvar no banco de dados.")
