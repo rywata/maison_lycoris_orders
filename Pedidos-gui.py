@@ -94,10 +94,14 @@ with c_add:
     st.write(" ")
     if st.button("➕ Adicionar"):
         if nome_cliente:
-            st.session_state.carrinho.append({
-                "produto": produto, "qtd": qtd, "preco_unitario": cardapio[produto], "subtotal": qtd * cardapio[produto]
-            })
-            st.toast(f"{produto} adicionado!", icon="🛒")
+            meu_carrinho_temp = Carrinho(st.session_state.carrinho, codigo_pasteis)
+            try:
+                meu_carrinho_temp.adicionar_item(produto, qtd, cardapio[produto])
+                #Validação das regras
+                st.session_state.carrinho = meu_carrinho_temp.itens
+                st.toast(f"{produto} adicionado!", icon="🛒")
+            except ValueError as e:
+                st.error(f"⚠️ Erro: {e}")
         else:
             st.warning("Preencha o nome do cliente!")
 
@@ -111,6 +115,7 @@ if st.session_state.carrinho:
         st.write(f"**{item['qtd']}x {item['produto']}** - R$ {item['subtotal']:.2f}")
 
     st.divider()
+    # ACESSO ÀS PROPERTIES
     if meu_carrinho.desconto_total > 0:
         st.write(f"Subtotal Bruto: R$ {meu_carrinho.total_bruto:.2f}")
         st.write(f"🎁 Desconto Combo: -R$ {meu_carrinho.desconto_total:.2f}")
