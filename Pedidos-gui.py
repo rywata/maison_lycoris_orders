@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from logic import Carrinho
+from logic_pedidos import Carrinho
 from database import Database, salvar_pedido
 
 # --- 0. SEGURANÇA (LOGIN) ---
