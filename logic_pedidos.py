@@ -1,3 +1,6 @@
+import pandas as pd
+from datetime import date
+
 class Carrinho:
     def __init__(self, lista_de_itens=None, nomes_dos_pasteis=None):
         self.itens = lista_de_itens if lista_de_itens is not None else []
@@ -36,3 +39,37 @@ class Carrinho:
     @property
     def total_final(self) -> float:
         return self.total_bruto - self.desconto_total
+
+class BuscaPedidos:
+    def __init__(self, df: pd.DataFrame):
+        self.df: pd.DataFrame = df
+
+    def por_cliente(self, nome: str) -> 'BuscaPedidos':
+        if nome:
+            self.df = self.df[self.df['Cliente'].str.contains(nome, case=False, na=False)]
+        return self
+
+    def por_intervalo_data(self, inicio: date, fim: date) -> 'BuscaPedidos':
+        self.df['Data'] = pd.to_datetime(self.df['Data']).dt.date
+        self.df = self.df[(self.df['Data'] >- inicio) & (self.df['Data'] <= fim)]
+        return self
+
+    def por_produto(self, produto: str) -> 'BuscaPedidos':
+        if produto in produto != 'Todos':
+            self.df = self.df[self.df['Produto'] == produto]
+        return self
+
+    def obter_resultado(self) -> pd.DataFrame:
+        return self.df
+
+class MetricaPedidos:
+    def __init__(self, df: pd.DataFrame):
+        self.df: pd.DataFrame = df
+
+    @property
+    def faturamento_total(self) -> float:
+        return float(self.df['Valor Total'].sum())
+        
+    @property
+    def contagem_pedidos(self) -> int:
+        return int(len(self.df))
