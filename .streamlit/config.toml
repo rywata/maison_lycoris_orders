@@ -1,0 +1,6 @@
+[theme]
+primaryColor = "#D32F2F" # Um vermelho que combine com a Lycoris
+backgroundColor = "#0E1117" # Fundo preto/chumbo
+secondaryBackgroundColor = "#262730" # Cor do sidebar
+textColor = "#FAFAFA" # Texto branco
+font = "sans serif"
