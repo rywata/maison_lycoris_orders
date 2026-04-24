@@ -87,13 +87,19 @@ def tela_inicio():
   df_vendas_hoje = df[df['Data Pedido'] == hoje]
 
   if not df_vendas_hoje.empty:
-    vendas_valor = df_vendas_hoje['Total Item Líquido'].apply(clean_currency).sum()
+      vendas_valor = (
+          df_vendas_hoje['Total Item Líquido']
+          .astype(str)
+          .str.replace('R$', '', regex=False)
+          .str.replace('.', '', regex=False)
+          .str.replace(',', '.', regex=False)
+          .str.strip()
+          .astype(float)
+          .sum()
+      )
   else:
-    vendas_valor = 0.0
+      vendas_valor = 0.0
  
-
-  vendas_valor = df_vendas_hoje['Total Item Líquido'].sum() if not df_vendas_hoje.empty else 0.0
-
   # Pedidos para hoje ou no futuro
   entregas_hoje = df[df['Data Entrega'] >= hoje]
   total_entregas_hoje = len(entregas_hoje)
