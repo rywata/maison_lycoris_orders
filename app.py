@@ -133,7 +133,6 @@ def tela_inicio():
     st.info("Nenhum pedido agendado para os próximos dias.")
 
 # Gerenciador de navegação na sidebar
-st.sidebar.markdown("### 🧭 Navegação")
 
 if 'aba_atual' not in st.session_state:
   st.session_state.aba_atual = "Início"
