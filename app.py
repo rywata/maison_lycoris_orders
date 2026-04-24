@@ -118,7 +118,7 @@ def tela_inicio():
   pedidos_futuros = df[df['Data Entrega'] >= hoje].sort_values('Data Entrega')
 
   if not pedidos_futuros.empty:
-    view_producao = pedidos_futuros[['Data Entrega', 'Cliente', 'Produto', 'Quantidade']].sort_values('Data Entrega')
+    view_producao = pedidos_futuros[['Data Entrega', 'Nome Cliente', 'Produto', 'Quantidade']].sort_values('Data Entrega')
     st.dataframe(view_producao, use_container_width=True, hide_index=True)
   else:
     st.info("Nenhum pedido agendado para os próximos dias.")
@@ -143,7 +143,7 @@ st.sidebar.button("💰 Faturamento", on_click=ir_para, args=("Faturamento",), u
 if st.session_state.aba_atual == "Início":
     tela_inicio()
 elif st.session_state.aba_atual == "Novo Pedido":
-    renderizar_novo_pedido
+    renderizar_novo_pedido()
 elif st.session_state.aba_atual == "Histórico":
     renderizar_historico()
 elif st.session_state.aba_atual == "Estoque":
