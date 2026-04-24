@@ -5,6 +5,7 @@ from database import Database
 from pedidos import renderizar_novo_pedido
 import pandas as pd
 import os
+import time
 
 # --- 0. SEGURANÇA (LOGIN) ---
 def check_password():
@@ -36,19 +37,24 @@ if not check_password():
 
 @st.cache_data(ttl=600)
 def carregar_dados_pedidos():
-  try:
-    db = Database()
+  for tentativa in range(3):
 
-    aba = db.conectar_aba("Controle", "Pedidos")
-    df = pd.DataFrame(aba.get_all_records())
+    try:
+      db = Database()
 
-    if not df.empty:
-      df['Data Pedido'] = pd.to_datetime(df['Data Pedido'], dayfirst=True).dt.date
-      df['Data Entrega'] = pd.to_datetime(df['Data Entrega'], dayfirst=True).dt.date
-    return df
-  except Exception as e:
-    st.error(f"Erro ao carregar dados: {e}")
-    return pd.DataFrame()
+      aba = db.conectar_aba("Controle", "Pedidos")
+      df = pd.DataFrame(aba.get_all_records())
+
+      if not df.empty:
+        df['Data Pedido'] = pd.to_datetime(df['Data Pedido'], dayfirst=True).dt.date
+        df['Data Entrega'] = pd.to_datetime(df['Data Entrega'], dayfirst=True).dt.date
+      return df
+    except Exception as e:
+      if "503" in str(e) and tentativa < 2:
+        time.sleep(1)
+        continue
+      st.error(f"Erro ao carregar dados: {e}")
+      return pd.DataFrame()
 
 def carregar_logo():
   caminho_logo = "assets/logo_black2.png"
