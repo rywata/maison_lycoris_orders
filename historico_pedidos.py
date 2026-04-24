@@ -18,12 +18,18 @@ def renderizar_historico():
 
     df.columns = df.columns.str.strip()
     df['Data Pedido'] = pd.to_datetime(df['Data Pedido'], dayfirst=True).dt.date
-    df['Valor Numérico'] = df['Total Item Líquido']
-    .astype(str)
-    .str.replace('R$', '', regex=False)
-    .str.replace('.', '', regex=False)
-    .str.replace(',', '.', regex=False)
-    .astype(float)
+    df['Valor Numérico'] = (
+      df['Total Item Líquido']
+      .astype(str)
+      .str.replace('R$', '', regex=False)
+      .str.replace('.', '', regex=False)
+      .str.replace(',', '.', regex=False)
+      .astype(float)
+    )
+  
+  except Exception as e:
+    st.error(f"Erro ao carregar dados: {e}")
+    return
 
   # 2. Menu lateral de filtros
   st.sidebar.header("🔍 Filtros de Busca")
@@ -63,5 +69,5 @@ def renderizar_historico():
   col2.metric("Soma Total", f"R$ {df_filtrado['Valor Numérico'].sum():,.2f}")
 
   # Tabela principal
-  colunas_visiveis = ['Data Pedido', 'Nome Cliente', 'Produto', 'Quantidade', 'Total Item Líquido', 'Data Entrega']
-  st.dataframe(df_filtrado[colunas_visiveis], use_container_width=True, hide_index=True)
+  colunas_reais = ['Data Pedido', 'Nome Cliente', 'Produto', 'Quantidade', 'Total Item Líquido', 'Data Entrega']
+  st.dataframe(df_filtrado[colunas_reais], use_container_width=True, hide_index=True)
