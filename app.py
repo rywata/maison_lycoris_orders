@@ -1,7 +1,27 @@
 import streamlit as st
 from historico_pedidos import renderizar_historico
 from datetime import date
+from database import Database
+import pandas as pd
 import os
+
+@st.cache_data(ttl=600)
+def carregar_dados_pedidos():
+  try:
+    db = Database()
+
+    aba = db.conectar_aba("Controle", "Pedidos")
+    df = pd.DataFrame(aba.get_all_records())
+
+    if not df.empty:
+      df['Data'] = pd.to_datetime(df['Data']).dt.date
+
+    return df
+  except Exception as e:
+    st.error(f"Erro ao carregar dados: {e}")
+    return pd.DataFrame()
+
+
 
 def carregar_logo():
   caminho_logo = "assets/logo_black2.png"
@@ -17,18 +37,41 @@ def tela_inicio():
   st.title("🥐 Maison Lycoris - Gestão Artesanal")
   st.write(f"Bem vindo! Hoje é dia {date.today().strftime('%d/%m/%Y')}")
 
-  #Dashboard
+  #1. Carregar dados
+  df = carregar_dados_pedidos()
+  hoje = date.today()
+
+  if df.empty:
+    st.warning("Nenhum dado encontrado na planilha Pedidos.")
+    return
+
+  #2. Metricas
+  df_vendas_hoje = df[df['Data'] == hoje]
+  vendas_valor = df_vendas_hoje['Total Item Líquido'].sum() if not df_vendas_hoje.empty else 0.0
+
+  # Pedidos para hoje ou no futuro
+  pedidos_pendentes = df[df['Data Entrega'] >= hoje.strftime('%d/%m/%Y')]
+  total_pendentes = len(pedidos_pendentes)
+
+
+  #3. Dashboard
   col1, col2, col3 = st.columns(3)
-  col1.metric("Vendas Hoje", "implementar valor vendas", "implementar variação")
-  col2.metric("Pedidos a Entregar", "implementar qtd pedidos")
-  col3.metric("Implementar metrica de estoque", "Produto", delta="-und kg", delta_color="inverse")
+  col1.metric("Vendas Hoje", f"R$ {vendas_valor:,.2f}")
+  col2.metric("Pedidos a Entregar", total_pendentes)
+  col3.metric("Estoque Crítico", "implementar", delta="implementar", delta_color="inverse")
 
   st.divider()
+
+  #4. Próximas fornadas
   st.subheader("Próximas fornadas")
-  st.info("implementar controle de produção")
+  if not pedidos_pendentes.empty:
+    view_producao = pedidos_pendentes['Data Entrega', 'Cliente', 'Produto', 'Quantidade']
+    st.dataframe(view_producao, use_container_width=True, hide_index=True)
+  else:
+    st.info("Nenhum pedido agendado para os próximos dias.")
 
 # Gerenciador de navegação na sidebar
-st.sidebar.image("assets/logo_black2.png", width=100)
+st.sidebar.image("assets/logo_black2.png", width=250)
 aba = st.sidebar.selectbox("Ir para: ", ["Início", "Novo Pedido", "Histórico", "Estoque", "Faturamento"])
 
 if aba == "Início":
