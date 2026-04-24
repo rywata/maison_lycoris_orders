@@ -14,24 +14,27 @@ def carregar_dados_pedidos():
     df = pd.DataFrame(aba.get_all_records())
 
     if not df.empty:
-      df['Data'] = pd.to_datetime(df['Data']).dt.date
-
+      df['Data'] = pd.to_datetime(df['Data'], dayfirst=True).dt.date
+      df['Data Entrega'] = pd.to_datetime(df['Data Entrega'], dayfirst=True).dt.date
     return df
   except Exception as e:
     st.error(f"Erro ao carregar dados: {e}")
     return pd.DataFrame()
 
-
-
 def carregar_logo():
   caminho_logo = "assets/logo_black2.png"
-
   if os.path.exists(caminho_logo):
-    st.sidebar.image(caminho_logo, width=150)
+    st.sidebar.image(caminho_logo, width=250)
   else:
     st.sidebar.title("Maison Lycoris")
 
 carregar_logo()
+
+#tratamento para converter strings de moeda
+def clean_currency(x):
+  if isinstance(x, str):
+    return float(x.replace('R$', '').replace('.', '').replace(',', '.').strip())
+  return(x) 
 
 def tela_inicio():
   st.title("🥐 Maison Lycoris - Gestão Artesanal")
@@ -47,6 +50,13 @@ def tela_inicio():
 
   #2. Metricas
   df_vendas_hoje = df[df['Data'] == hoje]
+
+  if not df_vendas_hoje.empty:
+    vendas_valor = df_vendas_hoje['Total Item Líquido'].apply(clean_currency).sum()
+  else:
+    vendas_valor = 0.0
+ 
+
   vendas_valor = df_vendas_hoje['Total Item Líquido'].sum() if not df_vendas_hoje.empty else 0.0
 
   # Pedidos para hoje ou no futuro
@@ -65,13 +75,12 @@ def tela_inicio():
   #4. Próximas fornadas
   st.subheader("Próximas fornadas")
   if not pedidos_pendentes.empty:
-    view_producao = pedidos_pendentes['Data Entrega', 'Cliente', 'Produto', 'Quantidade']
+    view_producao = pedidos_pendentes[['Data Entrega', 'Cliente', 'Produto', 'Quantidade']].sort_values('Data Entrega')
     st.dataframe(view_producao, use_container_width=True, hide_index=True)
   else:
     st.info("Nenhum pedido agendado para os próximos dias.")
 
 # Gerenciador de navegação na sidebar
-st.sidebar.image("assets/logo_black2.png", width=250)
 aba = st.sidebar.selectbox("Ir para: ", ["Início", "Novo Pedido", "Histórico", "Estoque", "Faturamento"])
 
 if aba == "Início":
