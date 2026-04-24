@@ -1,0 +1,24 @@
+# --- SEGURANÇA ---
+# Ignora as chaves locais do Google e configurações do Streamlit
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+
+*.json
+!Controle - Receitas Python.csv # Exemplo: se quiser manter CSVs específicos, use a "!"
+
+# --- PYTHON ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env
+
+# --- SISTEMA (macOS) ---
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+.Spotlight-V100
+.Trashes
