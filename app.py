@@ -46,6 +46,7 @@ def carregar_dados_pedidos():
       df = pd.DataFrame(aba.get_all_records())
 
       if not df.empty:
+        df.columns = df.columns.str.strip()
         df['Data Pedido'] = pd.to_datetime(df['Data Pedido'], dayfirst=True).dt.date
         df['Data Entrega'] = pd.to_datetime(df['Data Entrega'], dayfirst=True).dt.date
       return df
@@ -118,6 +119,14 @@ def tela_inicio():
   pedidos_futuros = df[df['Data Entrega'] >= hoje].sort_values('Data Entrega')
 
   if not pedidos_futuros.empty:
+    colunas_alvo = ['Data Entrega', 'Nome Cliente', 'Produto', 'Quantidade']
+    colunas_existentes = [c for c in colunas_alvo if c in pedidos_futuros.columns]
+
+    if len(colunas_existentes) < len(colunas_alvo):
+      faltantes = set(colunas_alvo) - set(colunas_existentes)
+      st.warning(f"⚠️ Coluna(s) não encontrada(s) na planilha: {faltantes}")
+      st.info(f"Colunas lidas: {list(df.columns)}")
+
     view_producao = pedidos_futuros[['Data Entrega', 'Nome Cliente', 'Produto', 'Quantidade']].sort_values('Data Entrega')
     st.dataframe(view_producao, use_container_width=True, hide_index=True)
   else:
