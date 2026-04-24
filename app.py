@@ -95,7 +95,7 @@ def tela_inicio():
   vendas_valor = df_vendas_hoje['Total Item Líquido'].sum() if not df_vendas_hoje.empty else 0.0
 
   # Pedidos para hoje ou no futuro
-  entregas_hoje = df[df['Data Entrega'] >= hoje.strftime('%d/%m/%Y')]
+  entregas_hoje = df[df['Data Entrega'] >= hoje]
   total_entregas_hoje = len(entregas_hoje)
 
 
