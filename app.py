@@ -14,7 +14,7 @@ def carregar_dados_pedidos():
     df = pd.DataFrame(aba.get_all_records())
 
     if not df.empty:
-      df['Data'] = pd.to_datetime(df['Data'], dayfirst=True).dt.date
+      df['Data Pedido'] = pd.to_datetime(df['Data Pedido'], dayfirst=True).dt.date
       df['Data Entrega'] = pd.to_datetime(df['Data Entrega'], dayfirst=True).dt.date
     return df
   except Exception as e:
@@ -49,7 +49,7 @@ def tela_inicio():
     return
 
   #2. Metricas
-  df_vendas_hoje = df[df['Data'] == hoje]
+  df_vendas_hoje = df[df['Data Pedido'] == hoje]
 
   if not df_vendas_hoje.empty:
     vendas_valor = df_vendas_hoje['Total Item Líquido'].apply(clean_currency).sum()
@@ -60,22 +60,24 @@ def tela_inicio():
   vendas_valor = df_vendas_hoje['Total Item Líquido'].sum() if not df_vendas_hoje.empty else 0.0
 
   # Pedidos para hoje ou no futuro
-  pedidos_pendentes = df[df['Data Entrega'] >= hoje.strftime('%d/%m/%Y')]
-  total_pendentes = len(pedidos_pendentes)
+  entregas_hoje = df[df['Data Entrega'] >= hoje.strftime('%d/%m/%Y')]
+  total_entregas_hoje = len(entregas_hoje)
 
 
   #3. Dashboard
   col1, col2, col3 = st.columns(3)
   col1.metric("Vendas Hoje", f"R$ {vendas_valor:,.2f}")
-  col2.metric("Pedidos a Entregar", total_pendentes)
+  col2.metric("Entregas para Hoje", total_entregas_hoje)
   col3.metric("Estoque Crítico", "implementar", delta="implementar", delta_color="inverse")
 
   st.divider()
 
   #4. Próximas fornadas
-  st.subheader("Próximas fornadas")
-  if not pedidos_pendentes.empty:
-    view_producao = pedidos_pendentes[['Data Entrega', 'Cliente', 'Produto', 'Quantidade']].sort_values('Data Entrega')
+  st.subheader("Cronograma de Produção")
+  pedidos_futuros = df[df['Data Entrega'] >= hoje].sort_values('Data Entrega')
+
+  if not pedidos_futuros.empty:
+    view_producao = pedidos_futuros[['Data Entrega', 'Cliente', 'Produto', 'Quantidade']].sort_values('Data Entrega')
     st.dataframe(view_producao, use_container_width=True, hide_index=True)
   else:
     st.info("Nenhum pedido agendado para os próximos dias.")
