@@ -2,8 +2,37 @@ import streamlit as st
 from historico_pedidos import renderizar_historico
 from datetime import date
 from database import Database
+from pedidos import renderizar_novo_pedido
 import pandas as pd
 import os
+
+# --- 0. SEGURANÇA (LOGIN) ---
+def check_password():
+    def password_entered():
+        if st.session_state["password"] == st.secrets["credentials"]["usernames"].get(st.session_state["username"]):
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]
+            del st.session_state["username"]
+        else:
+            st.session_state["password_correct"] = False
+            
+    if "password_correct" not in st.session_state:
+        st.title("🔐 Acesso Restrito - Maison Lycoris")
+        st.text_input("Usuário", key="username", autocomplete="username")
+        st.text_input("Senha", type="password", key="password", autocomplete="current-password")
+        st.button("Entrar", on_click=password_entered)
+        return False
+    elif not st.session_state["password_correct"]:
+        st.title("🔐 Acesso Restrito - Maison Lycoris")
+        st.text_input("Usuário", key="username")
+        st.text_input("Senha", type="password", key="password")
+        st.button("Entrar", on_click=password_entered)
+        st.error("😕 Usuário ou senha incorretos.")
+        return False
+    return True
+
+if not check_password():
+    st.stop()
 
 @st.cache_data(ttl=600)
 def carregar_dados_pedidos():
@@ -83,15 +112,29 @@ def tela_inicio():
     st.info("Nenhum pedido agendado para os próximos dias.")
 
 # Gerenciador de navegação na sidebar
-aba = st.sidebar.selectbox("Ir para: ", ["Início", "Novo Pedido", "Histórico", "Estoque", "Faturamento"])
+st.sidebar.markdown("### 🧭 Navegação")
 
-if aba == "Início":
-  tela_inicio()
-elif aba == "Novo Pedido":
-  #implementar tela pedidos e corrigir validação
-  pass
-elif aba == "Histórico":
-  renderizar_historico()
-elif aba == "Faturamento":
-  #implementar tela faturamento
-  pass
+if 'aba_atual' not in st.session_state:
+  st.session_state.aba_atual = "Início"
+
+def ir_para(nome_aba):
+  st.session_state.aba_atual = nome_aba
+
+# Botões sidebar
+st.sidebar.button("🏠 Início", on_click=ir_para, args=("Início",), use_container_width=True)
+st.sidebar.button("📝 Novo Pedido", on_click=ir_para, args=("Novo Pedido",), use_container_width=True)
+st.sidebar.button("📜 Histórico", on_click=ir_para, args=("Histórico",), use_container_width=True)
+st.sidebar.button("📦 Estoque", on_click=ir_para, args=("Estoque",), use_container_width=True)
+st.sidebar.button("💰 Faturamento", on_click=ir_para, args=("Faturamento",), use_container_width=True)
+
+# Lógica de renderização baseada no estado
+if st.session_state.aba_atual == "Início":
+    tela_inicio()
+elif st.session_state.aba_atual == "Novo Pedido":
+    renderizar_novo_pedido
+elif st.session_state.aba_atual == "Histórico":
+    renderizar_historico()
+elif st.session_state.aba_atual == "Estoque":
+    st.title("📦 Gestão de Estoque")
+elif st.session_state.aba_atual == "Faturamento":
+    st.title("💰 Faturamento")
