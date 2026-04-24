@@ -55,8 +55,11 @@ def renderizar_historico():
   df_filtrado = df.copy()
 
   if busca_nome:
-    df_filtrado[df_filtrado['Produto'] == produto_selecionado]
-  
+    df_filtrado = df_filtrado[df_filtrado['Nome Cliente'].str.contains(busca_nome, case=False, na=False)]
+
+  if produto_selecionado != "Todos":
+    df_filtrado = df_filtrado[df_filtrado['Produto'] == produto_selecionado]
+
   if isinstance(intervalo_data, tuple) and len(intervalo_data) == 2:
     df_filtrado = df_filtrado[
       (df_filtrado['Data Pedido'] >= intervalo_data[0]) &
