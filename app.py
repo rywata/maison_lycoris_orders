@@ -35,7 +35,7 @@ def check_password():
 if not check_password():
     st.stop()
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=60)
 def carregar_dados_pedidos():
   for tentativa in range(3):
 
