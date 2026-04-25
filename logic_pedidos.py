@@ -23,7 +23,7 @@ class Carrinho:
 
     @property
     def total_bruto(self) -> float:
-        return sum(item.get['subtotal', 0] for item in self.itens if item.get('subtotal') is not None)
+        return sum(item.get('subtotal', 0) for item in self.itens if isinstance(item, dict) and item.get('subtotal') is not None)
 
     @property
     def tem_desconto(self) -> bool:
