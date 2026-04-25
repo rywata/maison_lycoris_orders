@@ -73,7 +73,7 @@ def renderizar_novo_pedido():
         df_carrinho = pd.DataFrame(st.session_state.carrinho)
         df_editado = st.data_editor(
             df_carrinho,
-            num_rows="dynamic",
+            num_rows="dynamic", 
             use_container_width=True,
             column_config={
                 "produto": "Produto",
