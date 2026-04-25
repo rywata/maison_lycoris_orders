@@ -59,7 +59,7 @@ class BuscaPedidos:
 
     def por_intervalo_data(self, inicio: date, fim: date) -> 'BuscaPedidos':
         self.df['Data'] = pd.to_datetime(self.df['Data']).dt.date
-        self.df = self.df[(self.df['Data'] >- inicio) & (self.df['Data'] <= fim)]
+        self.df = self.df[(self.df['Data'] >= inicio) & (self.df['Data'] <= fim)]
         return self
 
     def por_produto(self, produto: str) -> 'BuscaPedidos':

@@ -21,8 +21,10 @@ def renderizar_novo_pedido():
         return
 
     # --- 2. ESTADO E CARDÁPIO ---
-    if 'carrinho' not in st.session_state: st.session_state.carrinho = []
-    if 'pedido_enviado' not in st.session_state: st.session_state.pedido_enviado = False
+    if 'carrinho' not in st.session_state: 
+        st.session_state.carrinho = []
+    if 'pedido_enviado' not in st.session_state:
+        st.session_state.pedido_enviado = False
 
     cardapio = {
         "Pão de Leite": 15.0, "Pão Integral": 17.0, "Pão Semi Integral": 17.0, "Shokupan": 17.0,
@@ -36,7 +38,7 @@ def renderizar_novo_pedido():
     with st.container():
         col1, col2 = st.columns(2)
         with col1:
-            nome_cliente = st.text_input("Nome do Cliente", placeholder="Ex: Zé Bedeu")
+            nome_cliente = st.text_input("Nome do Cliente", placeholder="Ex: Zé Bedeu", key="input_nome_cliente")
         with col2:
             data_sel = st.date_input("Data de Entrega", value=datetime.now(fuso_brasil), format="DD/MM/YYYY")
 
@@ -132,7 +134,9 @@ def renderizar_novo_pedido():
                     ])
                 
                 if salvar_pedido(aba_pedidos, dados_para_planilha):
-                    st.session_state.carrinho = [] 
+                    st.session_state.carrinho = []
+                    if "input_nome_cliente" in st.session_state:
+                        st.session_state.input_nome_cliente = ""
                     st.success("✅ Pedido enviado com sucesso!")
                     import time
                     time.sleep(2)
