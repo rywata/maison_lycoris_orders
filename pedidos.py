@@ -3,6 +3,9 @@ import pandas as pd
 from datetime import datetime
 from logic_pedidos import Carrinho
 from database import Database, salvar_pedido
+import pytz
+
+fuso_brasil = pytz.timezone('America/Sao_Paulo')
 
 def renderizar_novo_pedido():
     # --- 1. CONEXÃO ---
@@ -84,8 +87,8 @@ def renderizar_novo_pedido():
         st.metric("Total a Pagar", f"R$ {meu_carrinho.total_final:.2f}")
 
         if st.button("🚀 FINALIZAR E ENVIAR PEDIDO", use_container_width=True):
-            id_p = datetime.now().strftime("%Y%m%d%H%M")
-            dt_in = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            id_p = datetime.now(fuso_brasil).strftime("%Y%m%d%H%M")
+            dt_in = datetime.now(fuso_brasil).strftime("%Y-%m-%d %H:%M:%S")
             
             dados_para_planilha = []
             for item in meu_carrinho.itens:
