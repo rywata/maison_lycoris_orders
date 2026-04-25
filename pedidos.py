@@ -111,3 +111,37 @@ def renderizar_novo_pedido():
             if salvar_pedido(aba_pedidos, dados_para_planilha):
                 st.session_state.pedido_enviado = True
                 st.rerun()
+
+def renderizar_edicao_pedido():
+    st.subheader("🛒 Itens do Pedido Atual")
+
+    if "carrinho" not in st.session_state or not st.session_state.carrinho:
+        st.info("O carrinho está vazio.")
+        return
+
+    df_carrinho = pd.DataFrame(st.session_state.carrinho)
+
+    df_editado = st.data_editor(
+        df_carrinho,
+        num_rows="dynamic",
+        use_container_width=True,
+        column_config={
+            "Quantidade": st.column_config.NumberColumn(min_value=1),
+            "Preço Unitário": st.column_config.NumberColumn(disabled=True)
+        }
+    )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("🗑️ Limpar Tudo", type="secondary"):
+            st.session_state.carrinho = []
+            st.rerun()
+    
+    with col2:
+        if st.button("✅ Confirmar e Salvar Pedido", type="primary"):
+            st.session_state.carrinho = df_editado.to_dict('records')
+
+            st.success("Pedido enviado com sucesso!")
+            st.session_state.carrinho = []
+            st.rerun()
