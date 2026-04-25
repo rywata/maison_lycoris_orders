@@ -23,7 +23,11 @@ class Carrinho:
 
     @property
     def total_bruto(self) -> float:
-        return sum(item.get('subtotal', 0) for item in self.itens if isinstance(item, dict) and item.get('subtotal') is not None)
+        return sum(
+            (item.get('qtd', 0) * item.get('preco_unitario', 0)) 
+            for item in self.itens
+            if isinstance(item, dict)
+        )
 
     @property
     def tem_desconto(self) -> bool:
@@ -34,7 +38,11 @@ class Carrinho:
     def desconto_total(self) -> float:
         if not self.tem_desconto:
             return 0.0
-        return sum(item['subtotal'] * 0.15 for item in self.itens if item['produto'] in self.pasteis)
+        return sum(
+            (item.get('qtd', 0) * item.get('preco_unitario', 0)) * 0.15
+            for item in self.itens 
+            if item['produto'] in self.pasteis
+        )
 
     @property
     def total_final(self) -> float:
