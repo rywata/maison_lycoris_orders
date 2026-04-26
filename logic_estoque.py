@@ -46,7 +46,11 @@ class GerenciadorMovimentacao:
 
 class AnalisadorEstoque:
     def __init__(self, registros_brutos):
-        self.df = pd.DataFrame(registros_brutos)
+        if isinstance(registros_brutos, pd.DataFrame):
+            self.df = registros_brutos.copy()
+        else:
+            self.df = pd.DataFrame(registros_brutos)
+        
         if not self.df.empty:
             self.df.columns = self.df.columns.str.strip()
             self.df['Data Mov.'] = pd.to_datetime(self.df['Data Mov.'], errors='coerce')
