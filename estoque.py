@@ -1,45 +1,97 @@
 import streamlit as st
 import pandas as pd
 from database import Database
-from logic_estoque import AnalisadorEstoque
-
-#Receber entradas no estoque
-#Conectar com pedidos e debitar do estoque os insumos utilizados no pedido
-#Criar database com os dados dos insumos utilizados em cada produto
-#Gerar etiqueta com dados de cada lote cadastrado
+from logic_estoque import AnalisadorEstoque, GerenciadorMovimentacao
+from datetime import datetime
 
 def carregar_dados_estoque():
-  try:
-    db = Database()
-    aba =  db.conectar_aba("Controle", "Movimentações")
-    dados = aba.get_all_records()
-
-    df = pd.DataFrame(dados)
-
-    if not df.empty:
-      df.columns = df.columns.srt.strip()
-      return df
-    return pd.DataFrame(dados)
-  
-  except Exception as e:
-    st.error(f"Erro ao acessar aba de Movimentações: {e}")
-    return pd.DataFrame()
+    try:
+        db = Database()
+        aba = db.conectar_aba("Controle", "Movimentações")
+        dados = aba.get_all_records()
+        df = pd.DataFrame(dados)
+        if not df.empty:
+            df.columns = df.columns.str.strip()
+        return df
+    except Exception as e:
+        st.error(f"Erro ao acessar aba de Movimentações: {e}")
+        return pd.DataFrame()
 
 def renderizar_estoque():
-  st.title("📦 Gestão de Estoque")
+    st.title("📦 Gestão de Estoque")
 
-  #1. Busca de dados brutos
-  df_movimentacoes = carregar_dados_estoque()
+    df_movimentacoes = carregar_dados_estoque()
 
-  if df_movimentacoes.empty():
-    st.info("Nenhuma movimentalção de estoque registrada.")
-    return
+    if df_movimentacoes.empty:
+        st.info("Nenhuma movimentação de estoque registrada.")
+    else:
+        analisador = AnalisadorEstoque(df_movimentacoes)
+        st.subheader("Saldos Atuais")
+        st.dataframe(analisador.saldo_atual, use_container_width=True)
 
-  #2. Envia dados para a lógica
-  analisador = AnalisadorEstoque(df_movimentacoes)
+    st.divider()
+    st.subheader("Registrar Movimentação")
 
-  #3. Exibir saldo atual
-  st.subheader("Saldos Atuais")
-  st.dataframe(analisador.saldo_atual, use_container_width=True)
+    col1, col2, col3, col4 = st.columns(4)
 
+    if col1.button("📥 Compra (ENT-C)", use_container_width=True):
+        st.session_state.tipo_mov = "ENT-C"
+        st.session_state.mostrar_form = True
+    if col2.button("🏗️ Produção (SAI-P)", use_container_width=True):
+        st.session_state.tipo_mov = "SAI-P"
+        st.session_state.mostrar_form = True
+    if col3.button("🍞 Entrada Prod (ENT-P)", use_container_width=True):
+        st.session_state.tipo_mov = "ENT-P"
+        st.session_state.mostrar_form = True
+    if col4.button("💰 Venda (SAI-V)", use_container_width=True):
+        st.session_state.tipo_mov = "SAI-V"
+        st.session_state.mostrar_form = True
 
+    if st.session_state.get("mostrar_form"):
+        tipo = st.session_state.tipo_mov
+        
+        with st.form("form_movimentacao"):
+            st.markdown(f"### Registro: **{tipo}**")
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                item = st.text_input("Item")
+                qtd = st.number_input("Quantidade", min_value=0.0, step=0.001, format="%.3f")
+                un_medida = st.selectbox("Unidade de Medida", ["kg", "g", "L", "ml", "un"])
+                un_compra = st.text_input("Unidade de Compra (Ex: Saco 25kg)")
+            
+            with c2:
+                validade = st.date_input("Validade", value=None)
+                lote = st.text_input("Lote")
+                custo = st.number_input("Custo Unitário", min_value=0.0, step=0.01)
+
+            btn_col1, btn_col2 = st.columns(2)
+            with btn_col1:
+                if st.form_submit_button("✅ Salvar", use_container_width=True):
+                    gerenciador = GerenciadorMovimentacao(df_movimentacoes)
+                    
+                    linha_final = gerenciador.preparar_linha(
+                        codigo=tipo,
+                        item=item,
+                        qtd=qtd,
+                        unidade_medida=un_medida,
+                        unidade_compra=un_compra,
+                        custo_unitario=custo,
+                        validade=validade.strftime("%d/%m/%Y") if validade else "",
+                        lote=lote
+                    )
+
+                    try:
+                        db = Database()
+                        aba = db.conectar_aba("Controle", "Movimentações")
+                        aba.append_row(linha_final)
+                        st.success(f"Movimentação registrada! ID: {linha_final[0]}")
+                        st.session_state.mostrar_form = False
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao salvar: {e}")
+
+            with btn_col2:
+                if st.form_submit_button("❌ Cancelar", use_container_width=True):
+                    st.session_state.mostrar_form = False
+                    st.rerun()
