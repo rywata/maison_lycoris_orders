@@ -1,8 +1,9 @@
 import streamlit as st
 from historico_pedidos import renderizar_historico
+from pedidos import renderizar_novo_pedido
+from estoque import carregar_dados_estoque
 from datetime import date
 from database import Database
-from pedidos import renderizar_novo_pedido
 import pandas as pd
 import os
 import time
@@ -155,6 +156,6 @@ elif st.session_state.aba_atual == "Novo Pedido":
 elif st.session_state.aba_atual == "Histórico":
     renderizar_historico()
 elif st.session_state.aba_atual == "Estoque":
-    st.title("📦 Gestão de Estoque")
+    carregar_dados_estoque()
 elif st.session_state.aba_atual == "Faturamento":
     st.title("💰 Faturamento")
