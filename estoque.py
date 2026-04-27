@@ -37,6 +37,12 @@ def renderizar_estoque():
     df_movimentacoes = carregar_dados_estoque()
     df_cadastro = carregar_cadastro_insumos()
 
+    # Garante estado inicial fechado
+    if 'mostrar_form' not in st.session_state:
+        st.session_state.mostrar_form = False
+    if 'mostrar_busca' not in st.session_state:
+        st.session_state.mostrar_busca = False
+
     # --- SALDOS ATUAIS ---
     if df_movimentacoes.empty:
         st.info("Nenhuma movimentação de estoque registrada.")
@@ -47,7 +53,7 @@ def renderizar_estoque():
 
     st.divider()
 
-    # --- AÇÕES ---
+    # --- BOTÕES DE AÇÃO ---
     st.subheader("Ações")
 
     col1, col2, col3 = st.columns(3)
@@ -78,13 +84,12 @@ def renderizar_estoque():
         st.session_state.mostrar_form = True
         st.session_state.mostrar_busca = False
 
-    # Botão de busca separado, ocupa linha própria
     if st.button("🔍 Buscar Movimentações", use_container_width=True):
-        st.session_state.mostrar_busca = not st.session_state.get("mostrar_busca", False)
+        st.session_state.mostrar_busca = not st.session_state.mostrar_busca
         st.session_state.mostrar_form = False
 
-    # --- PAINEL DE BUSCA ---
-    if st.session_state.get("mostrar_busca") and not df_movimentacoes.empty:
+    # --- PAINEL DE BUSCA (só aparece após clicar no botão) ---
+    if st.session_state.mostrar_busca and not df_movimentacoes.empty:
         st.divider()
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -123,8 +128,8 @@ def renderizar_estoque():
             hide_index=True
         )
 
-    # --- FORMULÁRIO DE MOVIMENTAÇÃO ---
-    if st.session_state.get("mostrar_form"):
+    # --- FORMULÁRIO DE MOVIMENTAÇÃO (só aparece após clicar num botão de ação) ---
+    if st.session_state.mostrar_form:
         tipo = st.session_state.tipo_mov
         eh_ajuste = tipo in ("ENT-A", "SAI-A")
         st.divider()
@@ -157,7 +162,6 @@ def renderizar_estoque():
 
                 from logic_estoque import GestorRegras
                 gestor = GestorRegras(df_cadastro.to_dict('records')) if not df_cadastro.empty else None
-
                 itens_cadastrados = sorted(df_cadastro['Item'].dropna().tolist()) if not df_cadastro.empty else []
 
                 with c1:
@@ -173,7 +177,7 @@ def renderizar_estoque():
                     fator = gestor.obter_fator(item) if gestor and item else 1
 
                     qtd_compra = st.number_input("Quantidade comprada", min_value=0.0, step=1.0, format="%.0f",
-                                                  help=f"Em unidades de compra. Ex: 2 sacos")
+                                                  help="Em unidades de compra. Ex: 2 sacos")
                     un_compra = st.text_input("Unidade de Compra", value=un_compra_default)
 
                 with c2:
