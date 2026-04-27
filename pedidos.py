@@ -135,21 +135,21 @@ def renderizar_novo_pedido():
                     ])
                 
                 if salvar_pedido(aba_pedidos, dados_para_planilha):
-                    # --- DISPARA ORDENS DE PRODUÇÃO ---
                     try:
                         db = Database()
                         aba_mov = db.conectar_aba("Controle", "Movimentações")
                         aba_prod = db.conectar_aba("Controle", "Produção")
                         aba_receitas = db.conectar_aba("Controle", "Receitas Python")
-                        aba_precos = db.conectar_aba("Controle", "Preço Insumos")  # <- novo
+                        aba_precos = db.conectar_aba("Controle", "Preço Insumos")
 
                         df_mov = pd.DataFrame(aba_mov.get_all_records())
                         df_receitas = pd.DataFrame(aba_receitas.get_all_records())
-                        df_precos = pd.DataFrame(aba_precos.get_all_records())     # <- novo
+                        df_precos = pd.DataFrame(
+                            aba_precos.get_all_records(value_render_option='UNFORMATTED_VALUE')
+                        )
 
-                        from logic_producao import CalculadorCustos               # <- novo
-                        calc = CalculadorCustos(df_precos)                        # <- novo
-
+                        from logic_producao import CalculadorCustos
+                        calc = CalculadorCustos(df_precos)
                         produtor = GerenciadorProducao(df_receitas, df_mov)
 
                         todas_mov = []
@@ -160,7 +160,7 @@ def renderizar_novo_pedido():
                                 id_pedido=id_p,
                                 nome_produto=row['produto'].upper(),
                                 quantidade=int(row['qtd']),
-                                calculador=calc    # <- novo
+                                calculador=calc
                             )
                             if erro:
                                 st.warning(f"⚠️ {row['produto']}: {erro}. Estoque não movimentado.")

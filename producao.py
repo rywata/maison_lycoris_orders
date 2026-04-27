@@ -74,7 +74,6 @@ def renderizar_producao():
     df_receitas = carregar_receitas()
     df_movimentacoes = carregar_movimentacoes()
     df_precos = carregar_precos()
-    st.write("Preços brutos:", df_precos[['Item', 'Preço', 'Unidade']].head(10))
 
 
     # --- DASHBOARD DE ORDENS PENDENTES ---
@@ -198,11 +197,20 @@ def renderizar_producao():
                         db = Database()
                         aba_mov = db.conectar_aba("Controle", "Movimentações")
                         aba_prod = db.conectar_aba("Controle", "Produção")
+                        aba_precos_raw = db.conectar_aba("Controle", "Preço Insumos")
+
+                        df_precos_raw = pd.DataFrame(
+                            aba_precos_raw.get_all_records(value_render_option='UNFORMATTED_VALUE')
+                        )
+                        from logic_producao import CalculadorCustos
+                        calc = CalculadorCustos(df_precos_raw)
 
                         produtor = GerenciadorProducao(df_receitas, df_movimentacoes)
                         id_ref_final = id_ref if id_ref else "Avulso"
 
-                        linhas_mov, erro = produtor.gerar_movimentacoes(id_ref_final, produto, quantidade)
+                        linhas_mov, erro = produtor.gerar_movimentacoes(
+                            id_ref_final, produto, quantidade, calculador=calc
+                        )
                         if erro:
                             st.error(erro)
                         else:
@@ -245,13 +253,17 @@ def renderizar_producao():
 
 def _confirmar_producao(row, df_movimentacoes):
     try:
-        from logic_producao import GerenciadorStatusProducao
+        from logic_producao import GerenciadorStatusProducao, CalculadorCustos
 
         db = Database()
         aba_mov = db.conectar_aba("Controle", "Movimentações")
         aba_prod = db.conectar_aba("Controle", "Produção")
+        aba_precos = db.conectar_aba("Controle", "Preço Insumos")
 
-        gestor = GerenciadorStatusProducao(pd.DataFrame(), df_movimentacoes)
+        df_precos = pd.DataFrame(aba_precos.get_all_records(value_render_option='UNFORMATTED_VALUE'))
+        calc = CalculadorCustos(df_precos)
+
+        gestor = GerenciadorStatusProducao(pd.DataFrame(), df_movimentacoes, calc)
         linha_mov, novo_status = gestor.confirmar_producao(
             id_producao=row['ID Produção'],
             nome_produto=row['Produto'],
@@ -259,10 +271,8 @@ def _confirmar_producao(row, df_movimentacoes):
             data_entrega=row.get('Data Entrega', '')
         )
 
-        # Salva ENT-P no estoque
         aba_mov.append_row(linha_mov)
 
-        # Atualiza status na aba Produção
         todos = aba_prod.get_all_values()
         headers = todos[0]
         col_id = headers.index('ID Produção') + 1

@@ -86,27 +86,40 @@ class GerenciadorProducao:
         ]
 
 class GerenciadorStatusProducao:
-    def __init__(self, df_producao, df_movimentacoes):
+    def __init__(self, df_producao, df_movimentacoes, calculador=None):
         self.df_producao = df_producao.copy()
         self.gerenciador_mov = GerenciadorMovimentacao(df_movimentacoes)
+        self.calculador = calculador
 
     def confirmar_producao(self, id_producao, nome_produto, quantidade, data_entrega):
-        """
-        Gera a ENT-P do produto acabado e retorna o novo status.
-        Se a data de entrega já passou, marca como Entregue.
-        """
         hoje = date.today()
+
+        # Calcula custo unitário do produto acabado
+        custo_unitario_produto = 0.0
+        if self.calculador:
+            from logic_producao import GerenciadorProducao
+            # Não temos df_receitas aqui, então o custo do ENT-P
+            # fica zerado — é calculado na SAI-P dos ingredientes
+            pass
+
+        validade_produto = (datetime.now(fuso_brasil) + timedelta(days=4)).strftime("%d/%m/%Y")
 
         linha_mov = self.gerenciador_mov.preparar_linha(
             codigo="ENT-P",
             item=nome_produto,
             qtd=quantidade,
             unidade_medida="un",
+            unidade_compra="",
+            custo_unitario=0.0,
+            validade=validade_produto,
             lote=f"Produção {id_producao}"
         )
 
-        if isinstance(data_entrega, str):
-            data_entrega = date.fromisoformat(data_entrega)
+        if isinstance(data_entrega, str) and data_entrega:
+            try:
+                data_entrega = date.fromisoformat(data_entrega)
+            except ValueError:
+                data_entrega = hoje
 
         novo_status = "Entregue" if data_entrega <= hoje else "Concluído"
         return linha_mov, novo_status
