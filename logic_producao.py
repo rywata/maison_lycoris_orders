@@ -1,5 +1,5 @@
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
 import pytz
 from logic_estoque import GerenciadorMovimentacao
 
@@ -65,9 +65,34 @@ class GerenciadorProducao:
             nome_produto,
             quantidade,
             data_entrega,
-            "Concluído"
+            "Pendente"
         ]
 
+class GerenciadorStatusProducao:
+    def __init__(self, df_producao, df_movimentacoes):
+        self.df_producao = df_producao.copy()
+        self.gerenciador_mov = GerenciadorMovimentacao(df_movimentacoes)
+
+    def confirmar_producao(self, id_producao, nome_produto, quantidade, data_entrega):
+        """
+        Gera a ENT-P do produto acabado e retorna o novo status.
+        Se a data de entrega já passou, marca como Entregue.
+        """
+        hoje = date.today()
+
+        linha_mov = self.gerenciador_mov.preparar_linha(
+            codigo="ENT-P",
+            item=nome_produto,
+            qtd=quantidade,
+            unidade_medida="un",
+            lote=f"Produção {id_producao}"
+        )
+
+        if isinstance(data_entrega, str):
+            data_entrega = date.fromisoformat(data_entrega)
+
+        novo_status = "Entregue" if data_entrega <= hoje else "Concluído"
+        return linha_mov, novo_status
 
 class AnalisadorProducao:
     def __init__(self, df_producao):

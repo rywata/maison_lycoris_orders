@@ -135,6 +135,7 @@ def renderizar_novo_pedido():
                     ])
                 
                 if salvar_pedido(aba_pedidos, dados_para_planilha):
+                    # --- DISPARA ORDENS DE PRODUÇÃO ---
                     try:
                         db = Database()
                         aba_mov = db.conectar_aba("Controle", "Movimentações")
@@ -143,12 +144,14 @@ def renderizar_novo_pedido():
 
                         df_mov = pd.DataFrame(aba_mov.get_all_records())
                         df_receitas = pd.DataFrame(aba_receitas.get_all_records())
+
                         produtor = GerenciadorProducao(df_receitas, df_mov)
 
-                        todas_mov = []
-                        todas_prod = []
+                        todas_mov = []   
+                        todas_prod = []  
 
                         for _, row in df_editado.iterrows():
+                            # Baixa ingredientes do estoque imediatamente
                             linhas_mov, erro = produtor.gerar_movimentacoes(
                                 id_pedido=id_p,
                                 nome_produto=row['produto'].upper(),
@@ -158,7 +161,8 @@ def renderizar_novo_pedido():
                                 st.warning(f"⚠️ {row['produto']}: {erro}. Estoque não movimentado.")
                                 continue
 
-                            todas_mov.extend(linhas_mov)
+                            todas_mov.extend(linhas_mov[:-1])
+
                             todas_prod.append(produtor.gerar_ordem_producao(
                                 id_pedido=id_p,
                                 nome_produto=row['produto'],
@@ -167,16 +171,16 @@ def renderizar_novo_pedido():
                             ))
 
                         if todas_mov:
-                            aba_prod.append_rows(todas_prod, value_input_option='USER_ENTERED')
                             aba_mov.append_rows(todas_mov, value_input_option='USER_ENTERED')
+                        if todas_prod:
+                            aba_prod.append_rows(todas_prod, value_input_option='USER_ENTERED')
 
                     except Exception as e:
-                        st.warning(f"Pedido salvo, mas erro ao movimentar estoque: {e}")
+                        st.warning(f"Pedido salvo, mas erro ao gerar produção: {e}")
 
                     st.session_state.carrinho = []
-                    if "input_nome_cliente" in st.session_state:
-                        st.session_state.input_nome_cliente = ""
-                    st.success("✅ Pedido enviado e estoque movimentado!")
+                    st.session_state.pop("input_nome_cliente", None)
+                    st.success("✅ Pedido enviado! Produção aguardando confirmação.")
                     import time
                     time.sleep(2)
                     st.rerun()
