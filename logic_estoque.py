@@ -44,6 +44,26 @@ class GerenciadorMovimentacao:
             custo_total                                       # Custo Total
         ]
 
+    def preparar_linha_ajuste(self, item, qtd_contada, df_saldo_atual, motivo="Inventário"):
+        saldo = df_saldo_atual.get(item, 0)
+        diferenca = qtd_contada - saldo
+
+        if diferenca == 0:
+            return None, 0 
+            
+        codigo = "ENT-A" if diferenca > 0 else "SAI-A"
+        linha = self.preparar_linha(
+            codigo=codigo,
+            item=item,
+            qtd=abs(diferenca),
+            unidade_medida="",
+            unidade_compra="",
+            custo_unitario=0.0,
+            validade="",
+            lote=f"Ajuste: {motivo}"
+        )
+        return linha, diferenca
+
 class AnalisadorEstoque:
     def __init__(self, registros_brutos):
         if isinstance(registros_brutos, pd.DataFrame):
