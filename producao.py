@@ -101,8 +101,6 @@ def renderizar_producao():
                     with c1:
                         st.markdown(f"**{row['Produto']}**")
                         st.caption(f"Pedido `{row['ID Pedido']}`")
-
-                        # Custo estimado da ordem
                         if not df_receitas.empty and not df_precos.empty:
                             from logic_producao import CalculadorCustos, GerenciadorProducao
                             produtor = GerenciadorProducao(df_receitas, df_movimentacoes)
@@ -112,20 +110,20 @@ def renderizar_producao():
                             )
                             if insumos:
                                 _, total = calc.calcular_custo_receita(insumos)
-                                st.caption(f"Custo estimado: **R$ {total:.2f}**")
+                                st.caption(f"Custo estimado: R$ {total:.2f}")
 
                     with c2:
-                        st.markdown("**Quantidade**")
+                        st.markdown("**Qtd**")
                         st.markdown(f"{int(float(row['Quantidade']))} un")
 
                     with c3:
                         st.markdown("**Entrega**")
                         data_fmt = row.get('Data Entrega', '—')
-                        st.markdown(f"`{data_fmt}`")
+                        st.markdown(f"{data_fmt}")
 
                     with c4:
                         st.button(
-                            "✅ Concluir produção",
+                            "✅ Concluir",
                             key=f"concluir_{row['ID Produção']}",
                             use_container_width=True,
                             type="primary",
