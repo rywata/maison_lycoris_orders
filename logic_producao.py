@@ -117,67 +117,47 @@ class CalculadorCustos:
         if not self.precos.empty:
             self.precos.columns = self.precos.columns.str.strip()
 
-            def parse_numero(serie):
-                s = serie.astype(str).str.strip()
+            def limpar_valor_numerico(serie):
+                # Remove R$, espaços e pontos de milhar, troca vírgula por ponto
+                s = serie.astype(str).str.replace(r'R\$', '', regex=True).str.strip()
+                s = s.str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+                return pd.to_numeric(s, errors='coerce')
 
-                tem_virgula = s.str.contains(',', regex=False)
-                tem_ponto = s.str.contains(r'\.', regex=True)
+            precos_limpos = limpar_valor_numerico(self.precos['Preço']).fillna(0)
+            unidades_limpas = limpar_valor_numerico(self.precos['Unidade']).fillna(1)
+            
+            unidades_limpas = unidades_limpas.replace(0, 1)
 
-                resultado = pd.Series(index=s.index, dtype='float64')
-
-                # Formato BR: tem vírgula (pode ter ponto de milhar)
-                mask_br = tem_virgula
-                resultado[mask_br] = pd.to_numeric(
-                    s[mask_br]
-                    .str.replace('.', '', regex=False)   # remove milhar
-                    .str.replace(',', '.', regex=False), # vírgula → ponto
-                    errors='coerce'
-                )
-
-                # Formato anglo ou inteiro: não tem vírgula
-                mask_anglo = ~tem_virgula
-                resultado[mask_anglo] = pd.to_numeric(
-                    s[mask_anglo],
-                    errors='coerce'
-                )
-
-                return resultado
-
-            self.precos['Preço'] = parse_numero(self.precos['Preço']).fillna(0)
-            self.precos['Unidade'] = parse_numero(self.precos['Unidade']).fillna(1)
-            self.precos['Custo Unitário'] = self.precos['Preço'] / self.precos['Unidade']
-            self._idx = self.precos.set_index('Item')
+            self.precos['Custo Calculado'] = precos_limpos / unidades_limpas
+            
+            self.mapa_custos = {
+                str(item).strip().upper(): custo 
+                for item, custo in zip(self.precos['Item'], self.precos['Custo Calculado'])
+            }
 
     def custo_por_unidade(self, item):
-        item_upper = str(item).strip().upper()
-
-        if not hasattr(self, '_idx_upper'):
-            self._idx_upper = {str(k).upper(): v for k, v in self._idx['Custo Unitário'].to_dict().items()}
-        
-        return self._idx_upper.get(item_upper, None)
+        item_busca = str(item).strip().upper()
+        return self.mapa_custos.get(item_busca, 0.0)
 
     def calcular_custo_receita(self, insumos):
         linhas = []
+        custo_total_geral = 0.0
+        
         for insumo in insumos:
             custo_unit = self.custo_por_unidade(insumo['item'])
-            if custo_unit is None:
-                custo_total = None
-                obs = "⚠️ Preço não cadastrado"
-            else:
-                custo_total = custo_unit * insumo['qtd']
-                obs = ""
+            custo_total_insumo = custo_unit * insumo['qtd']
+            custo_total_geral += custo_total_insumo
+            
             linhas.append({
                 'Item': insumo['item'],
                 'Quantidade': insumo['qtd'],
                 'Unidade': insumo['unidade'],
-                'Custo Unit. (R$/un)': round(custo_unit, 6) if custo_unit else None,
-                'Custo Total (R$)': round(custo_total, 4) if custo_total else None,
-                'Obs': obs
+                'Custo Unit. (R$/un)': round(custo_unit, 6),
+                'Custo Total (R$)': round(custo_total_insumo, 4),
+                'Obs': "" if custo_unit > 0 else "⚠️ Preço não cadastrado"
             })
 
-        df = pd.DataFrame(linhas)
-        total = df['Custo Total (R$)'].sum()
-        return df, total
+        return pd.DataFrame(linhas), custo_total_geral
 
 class AnalisadorProducao:
     def __init__(self, df_producao):
