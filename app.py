@@ -4,6 +4,7 @@ from pedidos import renderizar_novo_pedido
 from estoque import renderizar_estoque
 from datetime import date
 from database import Database
+from producao import renderizar_producao
 import pandas as pd
 import os
 import time
@@ -146,7 +147,9 @@ st.sidebar.button("🏠 Início", on_click=ir_para, args=("Início",), use_conta
 st.sidebar.button("📝 Novo Pedido", on_click=ir_para, args=("Novo Pedido",), use_container_width=True)
 st.sidebar.button("📜 Histórico", on_click=ir_para, args=("Histórico",), use_container_width=True)
 st.sidebar.button("📦 Estoque", on_click=ir_para, args=("Estoque",), use_container_width=True)
+st.sidebar.button("🏗️ Produção", on_click=ir_para, args=("Produção",), use_container_width=True)
 st.sidebar.button("💰 Faturamento", on_click=ir_para, args=("Faturamento",), use_container_width=True)
+
 
 # Lógica de renderização baseada no estado
 if st.session_state.aba_atual == "Início":
@@ -157,5 +160,7 @@ elif st.session_state.aba_atual == "Histórico":
     renderizar_historico()
 elif st.session_state.aba_atual == "Estoque":
     renderizar_estoque()
+elif st.session_state.aba_atual == "Produção":
+    renderizar_producao()
 elif st.session_state.aba_atual == "Faturamento":
     st.title("💰 Faturamento")
