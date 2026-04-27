@@ -117,24 +117,28 @@ class CalculadorCustos:
         if not self.precos.empty:
             self.precos.columns = self.precos.columns.str.strip()
 
-            def limpar_valor_numerico(serie):
-                # Remove R$, espaços e pontos de milhar, troca vírgula por ponto
-                s = serie.astype(str).str.replace(r'R\$', '', regex=True).str.strip()
-                s = s.str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
-                return pd.to_numeric(s, errors='coerce')
+            def parse_numero(valor):
+                """
+                Converte string numérica para float.
+                Detecta formato BR (vírgula decimal) vs anglo (ponto decimal).
+                Nunca remove ponto de valores sem vírgula.
+                """
+                s = str(valor).strip().replace('R$', '').replace(' ', '')
+                if ',' in s:
+                    # Formato BR: remove pontos de milhar, troca vírgula por ponto
+                    s = s.replace('.', '').replace(',', '.')
+                # Se não tem vírgula, já está em formato anglo ou é inteiro — não mexe
+                try:
+                    return float(s)
+                except ValueError:
+                    return 0.0
 
-            precos_limpos = limpar_valor_numerico(self.precos['Preço']).fillna(0)
-            unidades_limpas = limpar_valor_numerico(self.precos['Unidade']).fillna(1)
+            self.precos['Preço'] = self.precos['Preço'].apply(parse_numero)
+            self.precos['Unidade'] = self.precos['Unidade'].apply(parse_numero)
+            self.precos['Unidade'] = self.precos['Unidade'].replace(0, 1)
+            self.precos['Custo Unitário'] = self.precos['Preço'] / self.precos['Unidade']
+            self._idx = self.precos.set_index('Item')
             
-            unidades_limpas = unidades_limpas.replace(0, 1)
-
-            self.precos['Custo Calculado'] = precos_limpos / unidades_limpas
-            
-            self.mapa_custos = {
-                str(item).strip().upper(): custo 
-                for item, custo in zip(self.precos['Item'], self.precos['Custo Calculado'])
-            }
-
     def custo_por_unidade(self, item):
         item_busca = str(item).strip().upper()
         return self.mapa_custos.get(item_busca, 0.0)
