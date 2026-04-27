@@ -116,49 +116,39 @@ class CalculadorCustos:
         self.precos = pd.DataFrame(df_precos)
         if not self.precos.empty:
             self.precos.columns = self.precos.columns.str.strip()
-
-            def parse_numero(valor):
-                """
-                Converte string numérica para float.
-                Detecta formato BR (vírgula decimal) vs anglo (ponto decimal).
-                Nunca remove ponto de valores sem vírgula.
-                """
-                s = str(valor).strip().replace('R$', '').replace(' ', '')
-                if ',' in s:
-                    # Formato BR: remove pontos de milhar, troca vírgula por ponto
-                    s = s.replace('.', '').replace(',', '.')
-                # Se não tem vírgula, já está em formato anglo ou é inteiro — não mexe
-                try:
-                    return float(s)
-                except ValueError:
-                    return 0.0
-
-            self.precos['Preço'] = self.precos['Preço'].apply(parse_numero)
-            self.precos['Unidade'] = self.precos['Unidade'].apply(parse_numero)
+            self.precos['Preço'] = pd.to_numeric(self.precos['Preço'], errors='coerce').fillna(0)
+            self.precos['Unidade'] = pd.to_numeric(self.precos['Unidade'], errors='coerce').fillna(1)
             self.precos['Unidade'] = self.precos['Unidade'].replace(0, 1)
             self.precos['Custo Unitário'] = self.precos['Preço'] / self.precos['Unidade']
             self._idx = self.precos.set_index('Item')
-            
+
     def custo_por_unidade(self, item):
         item_busca = str(item).strip().upper()
-        return self.mapa_custos.get(item_busca, 0.0)
+        chave = {str(k).strip().upper(): k for k in self._idx.index}
+        if item_busca not in chave:
+            return None
+        return self._idx.loc[chave[item_busca], 'Custo Unitário']
 
     def calcular_custo_receita(self, insumos):
         linhas = []
         custo_total_geral = 0.0
-        
+
         for insumo in insumos:
             custo_unit = self.custo_por_unidade(insumo['item'])
-            custo_total_insumo = custo_unit * insumo['qtd']
+            if custo_unit is None:
+                custo_total_insumo = 0.0
+                obs = "⚠️ Preço não cadastrado"
+            else:
+                custo_total_insumo = custo_unit * insumo['qtd']
+                obs = ""
             custo_total_geral += custo_total_insumo
-            
             linhas.append({
                 'Item': insumo['item'],
                 'Quantidade': insumo['qtd'],
                 'Unidade': insumo['unidade'],
-                'Custo Unit. (R$/un)': round(custo_unit, 6),
+                'Custo Unit. (R$/un)': round(custo_unit, 6) if custo_unit else 0.0,
                 'Custo Total (R$)': round(custo_total_insumo, 4),
-                'Obs': "" if custo_unit > 0 else "⚠️ Preço não cadastrado"
+                'Obs': obs
             })
 
         return pd.DataFrame(linhas), custo_total_geral

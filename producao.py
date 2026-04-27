@@ -53,7 +53,7 @@ def carregar_precos():
     try:
         db = Database()
         aba = db.conectar_aba("Controle", "Preço Insumos")
-        dados = aba.get_all_records()
+        dados = aba.get_all_records(value_render_option='UNFORMATTED_VALUE')
         df = pd.DataFrame(dados)
         if not df.empty:
             df.columns = df.columns.str.strip()
