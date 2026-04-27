@@ -63,12 +63,18 @@ def carregar_precos():
         return pd.DataFrame()
 
 def renderizar_producao():
-    st.title("🏗️ Gestão de Produção")
-
     if 'mostrar_form_producao' not in st.session_state:
         st.session_state.mostrar_form_producao = False
     if 'mostrar_busca_producao' not in st.session_state:
         st.session_state.mostrar_busca_producao = False
+
+    if st.session_state.get('_producao_confirmada'):
+        st.success(st.session_state.pop('_producao_msg', ''))
+        st.session_state._producao_confirmada = False
+        st.cache_data.clear()
+        st.rerun()
+    if st.session_state.get('_producao_erro'):
+        st.error(f"Erro ao confirmar: {st.session_state.pop('_producao_erro')}")
 
     df_producao = carregar_dados_producao()
     df_receitas = carregar_receitas()
@@ -129,7 +135,7 @@ def renderizar_producao():
                             use_container_width=True,
                             type="primary",
                             on_click=_confirmar_producao,
-                            args=(row, df_movimentacoes)
+                            args=(row, df_movimentacoes, df_precos)  # <- passa df_precos
                         )
 
             st.divider()
@@ -251,17 +257,20 @@ def renderizar_producao():
         )
 
 
-def _confirmar_producao(row, df_movimentacoes):
+def _confirmar_producao(row, df_movimentacoes, df_precos):
     try:
         from logic_producao import GerenciadorStatusProducao, CalculadorCustos
 
         db = Database()
         aba_mov = db.conectar_aba("Controle", "Movimentações")
         aba_prod = db.conectar_aba("Controle", "Produção")
-        aba_precos = db.conectar_aba("Controle", "Preço Insumos")
 
-        df_precos = pd.DataFrame(aba_precos.get_all_records(value_render_option='UNFORMATTED_VALUE'))
-        calc = CalculadorCustos(df_precos)
+        # Busca preços frescos sem cache
+        aba_precos = db.conectar_aba("Controle", "Preço Insumos")
+        df_precos_fresh = pd.DataFrame(
+            aba_precos.get_all_records(value_render_option='UNFORMATTED_VALUE')
+        )
+        calc = CalculadorCustos(df_precos_fresh)
 
         gestor = GerenciadorStatusProducao(pd.DataFrame(), df_movimentacoes, calc)
         linha_mov, novo_status = gestor.confirmar_producao(
@@ -283,9 +292,9 @@ def _confirmar_producao(row, df_movimentacoes):
                 aba_prod.update_cell(i, col_status, novo_status)
                 break
 
-        st.success(f"✅ {row['Produto']} marcado como {novo_status}!")
-        st.cache_data.clear()
-        st.rerun()
+        # Sinaliza para o rerun acontecer fora do callback
+        st.session_state._producao_confirmada = True
+        st.session_state._producao_msg = f"✅ {row['Produto']} marcado como {novo_status}!"
 
     except Exception as e:
-        st.error(f"Erro ao confirmar produção: {e}")
+        st.session_state._producao_erro = str(e)
