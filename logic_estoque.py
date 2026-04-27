@@ -50,7 +50,7 @@ class GerenciadorMovimentacao:
 
         if diferenca == 0:
             return None, 0 
-            
+
         codigo = "ENT-A" if diferenca > 0 else "SAI-A"
         linha = self.preparar_linha(
             codigo=codigo,
@@ -110,24 +110,41 @@ class BuscaEstoque:
 
         if item:
             temp = temp[temp['Item'].str.contains(item, case=False, na=False)]
-
         if tipo != "Todos":
             temp = temp[temp['Tipo'] == tipo]
-
         if data_inicio:
             temp = temp[temp['Data Mov.'] >= pd.Timestamp(data_inicio)]
-
         if data_fim:
             temp = temp[temp['Data Mov.'] <= pd.Timestamp(data_fim)]
 
         self.df_filtrado = temp
 
     @property
-    def total_entradas(self):
-        mask = self.df_filtrado['Quantidade'] > 0
-        return self.df_filtrado.loc[mask, 'Quantidade'].sum()
+    def item_unico(self):
+        itens = self.df_filtrado['Item'].dropna().unique()
+        return itens[0] if len(itens) == 1 else None
 
     @property
-    def total_saidas(self):
-        mask = self.df_filtrado['Quantidade'] < 0
-        return self.df_filtrado.loc[mask, 'Quantidade'].sum()
+    def resumo_por_item(self):
+        if self.df_filtrado.empty:
+            return pd.DataFrame()
+
+        df = self.df_filtrado.copy()
+        entradas = (
+            df[df['Quantidade'] > 0]
+            .groupby(['Item', 'Unidade de Medida'])['Quantidade']
+            .sum()
+            .reset_index()
+            .rename(columns={'Quantidade': 'Entradas'})
+        )
+        saidas = (
+            df[df['Quantidade'] < 0]
+            .groupby(['Item', 'Unidade de Medida'])['Quantidade']
+            .sum()
+            .abs()
+            .reset_index()
+            .rename(columns={'Quantidade': 'Saídas'})
+        )
+        resumo = pd.merge(entradas, saidas, on=['Item', 'Unidade de Medida'], how='outer').fillna(0)
+        resumo['Saldo período'] = resumo['Entradas'] - resumo['Saídas']
+        return resumo
