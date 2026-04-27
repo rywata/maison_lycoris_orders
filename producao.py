@@ -92,7 +92,8 @@ def renderizar_producao():
                         st.metric("Quantidade", f"{int(float(row['Quantidade']))} un")
 
                     with c3:
-                        st.metric("Entrega", row['Data Entrega'])
+                        data_entrega_str = row.get('Data Entrega', '-')
+                        st.metric("Entrega", data_entrega_str])
 
                     with c4:
                         if st.button("✅ Concluir", key=f"concluir_{row['ID Produção']}",
@@ -101,7 +102,7 @@ def renderizar_producao():
 
             st.divider()
 
-        # --- CONCLUÍDOS RECENTES ---
+        # --- CLUÍDOS RECENTES ---
         if not concluidos.empty:
             with st.expander(f"✅ Histórico de produções concluídas ({len(concluidos)})"):
                 st.dataframe(
@@ -218,7 +219,7 @@ def _confirmar_producao(row, df_movimentacoes):
             id_producao=row['ID Produção'],
             nome_produto=row['Produto'],
             quantidade=int(float(row['Quantidade'])),
-            data_entrega=row['Data Entrega']
+            data_entrega=row.get['Data Entrega', '']
         )
 
         # Salva ENT-P no estoque
