@@ -92,13 +92,29 @@ class AnalisadorEstoque:
 
 class GestorRegras:
     def __init__(self, dados_cadastro):
-        self.regras = pd.DataFrame(dados_cadastro).set_index('Item').to_dict('index')
-  
-    def obter_minimo(self, item):
-        return self.regras.get(item, {}).get('Estoque Mínimo', 0)
+        df = pd.DataFrame(dados_cadastro)
+        if not df.empty:
+            df.columns = df.columns.str.strip()
+            df['Fator Conversão'] = pd.to_numeric(df['Fator Conversão'], errors='coerce').fillna(1)
+            df['Estoque Mínimo'] = pd.to_numeric(df['Estoque Mínimo'], errors='coerce').fillna(0)
+            self.regras = df.set_index('Item').to_dict('index')
+        else:
+            self.regras = {}
+
+    def obter_unidade_compra(self, item):
+        return self.regras.get(item, {}).get('Unidade Compra', '')
+
+    def obter_unidade_receita(self, item):
+        return self.regras.get(item, {}).get('Unidade Receita', '')
 
     def obter_fator(self, item):
         return self.regras.get(item, {}).get('Fator Conversão', 1)
+
+    def obter_minimo(self, item):
+        return self.regras.get(item, {}).get('Estoque Mínimo', 0)
+
+    def converter_compra_para_receita(self, item, qtd_comprada):
+        return qtd_comprada * self.obter_fator(item)
 
 class BuscaEstoque:
     def __init__(self, df):

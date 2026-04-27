@@ -4,6 +4,20 @@ from database import Database
 from logic_estoque import AnalisadorEstoque, GerenciadorMovimentacao, BuscaEstoque
 from datetime import datetime
 
+@st.cache_data(ttl=300)
+def carregar_cadastro_insumos():
+    try:
+        db = Database()
+        aba = db.conectar_aba("Controle", "Cadastro de Insumos")
+        dados = aba.get_all_records()
+        df = pd.DataFrame(dados)
+        if not df.empty:
+            df.columns = df.columns.str.strip()
+        return df
+    except Exception as e:
+        st.error(f"Erro ao acessar Cadastro de Insumos: {e}")
+        return pd.DataFrame()
+
 def carregar_dados_estoque():
     try:
         db = Database()
@@ -21,7 +35,9 @@ def renderizar_estoque():
     st.title("📦 Gestão de Estoque")
 
     df_movimentacoes = carregar_dados_estoque()
+    df_cadastro = carregar_cadastro_insumos()
 
+    # --- SALDOS ATUAIS ---
     if df_movimentacoes.empty:
         st.info("Nenhuma movimentação de estoque registrada.")
     else:
@@ -31,12 +47,46 @@ def renderizar_estoque():
 
     st.divider()
 
-    # --- BUSCA ---
-    st.subheader("🔍 Buscar movimentações")
+    # --- AÇÕES ---
+    st.subheader("Ações")
 
-    if not df_movimentacoes.empty:
+    col1, col2, col3 = st.columns(3)
+    if col1.button("📥 Compra (ENT-C)", use_container_width=True):
+        st.session_state.tipo_mov = "ENT-C"
+        st.session_state.mostrar_form = True
+        st.session_state.mostrar_busca = False
+    if col2.button("🏗️ Produção (SAI-P)", use_container_width=True):
+        st.session_state.tipo_mov = "SAI-P"
+        st.session_state.mostrar_form = True
+        st.session_state.mostrar_busca = False
+    if col3.button("🍞 Entrada Prod (ENT-P)", use_container_width=True):
+        st.session_state.tipo_mov = "ENT-P"
+        st.session_state.mostrar_form = True
+        st.session_state.mostrar_busca = False
+
+    col4, col5, col6 = st.columns(3)
+    if col4.button("💰 Venda (SAI-V)", use_container_width=True):
+        st.session_state.tipo_mov = "SAI-V"
+        st.session_state.mostrar_form = True
+        st.session_state.mostrar_busca = False
+    if col5.button("🛠️ Ajuste Entrada (ENT-A)", use_container_width=True):
+        st.session_state.tipo_mov = "ENT-A"
+        st.session_state.mostrar_form = True
+        st.session_state.mostrar_busca = False
+    if col6.button("🛠️ Ajuste Saída (SAI-A)", use_container_width=True):
+        st.session_state.tipo_mov = "SAI-A"
+        st.session_state.mostrar_form = True
+        st.session_state.mostrar_busca = False
+
+    # Botão de busca separado, ocupa linha própria
+    if st.button("🔍 Buscar Movimentações", use_container_width=True):
+        st.session_state.mostrar_busca = not st.session_state.get("mostrar_busca", False)
+        st.session_state.mostrar_form = False
+
+    # --- PAINEL DE BUSCA ---
+    if st.session_state.get("mostrar_busca") and not df_movimentacoes.empty:
+        st.divider()
         col1, col2, col3 = st.columns(3)
-
         with col1:
             filtro_item = st.text_input("Filtrar por item", placeholder="Ex: Farinha")
         with col2:
@@ -72,44 +122,14 @@ def renderizar_estoque():
             use_container_width=True,
             hide_index=True
         )
-    else:
-        st.info("Sem dados para buscar.")
 
-    st.divider()
-
-
-
-    st.subheader("Registrar Movimentação")
-
-    col1, col2, col3 = st.columns(3)
-    if col1.button("📥 Compra (ENT-C)", use_container_width=True):
-        st.session_state.tipo_mov = "ENT-C"
-        st.session_state.mostrar_form = True
-    if col2.button("🏗️ Produção (SAI-P)", use_container_width=True):
-        st.session_state.tipo_mov = "SAI-P"
-        st.session_state.mostrar_form = True
-    if col3.button("🍞 Entrada Prod (ENT-P)", use_container_width=True):
-        st.session_state.tipo_mov = "ENT-P"
-        st.session_state.mostrar_form = True
-
-    col4, col5, col6 = st.columns(3)
-    if col4.button("💰 Venda (SAI-V)", use_container_width=True):
-        st.session_state.tipo_mov = "SAI-V"
-        st.session_state.mostrar_form = True
-    if col5.button("🛠️ Ajuste Entrada (ENT-A)", use_container_width=True):
-        st.session_state.tipo_mov = "ENT-A"
-        st.session_state.mostrar_form = True
-    if col6.button("🛠️ Ajuste Saída (SAI-A)", use_container_width=True):
-        st.session_state.tipo_mov = "SAI-A"
-        st.session_state.mostrar_form = True
-
+    # --- FORMULÁRIO DE MOVIMENTAÇÃO ---
     if st.session_state.get("mostrar_form"):
         tipo = st.session_state.tipo_mov
         eh_ajuste = tipo in ("ENT-A", "SAI-A")
+        st.divider()
 
         with st.form("form_movimentacao"):
-
-            # --- FORMULÁRIO DE AJUSTE ---
             if eh_ajuste:
                 st.markdown("### 🛠️ Ajuste de estoque")
                 st.info("Informe a quantidade **real contada** no inventário. O sistema calcula a diferença automaticamente.")
@@ -131,21 +151,42 @@ def renderizar_estoque():
 
                 motivo = st.selectbox("Motivo", ["Inventário", "Perda/Descarte", "Erro de lançamento", "Outro"])
 
-            # --- FORMULÁRIO PADRÃO ---
             else:
                 st.markdown(f"### Registro: **{tipo}**")
                 c1, c2 = st.columns(2)
+
+                from logic_estoque import GestorRegras
+                gestor = GestorRegras(df_cadastro.to_dict('records')) if not df_cadastro.empty else None
+
+                itens_cadastrados = sorted(df_cadastro['Item'].dropna().tolist()) if not df_cadastro.empty else []
+
                 with c1:
-                    item = st.text_input("Item")
-                    qtd = st.number_input("Quantidade", min_value=0.0, step=0.001, format="%.3f")
-                    un_medida = st.selectbox("Unidade de Medida", ["kg", "g", "L", "ml", "un"])
-                    un_compra = st.text_input("Unidade de Compra (Ex: Saco 25kg)")
+                    if itens_cadastrados:
+                        item = st.selectbox("Item", ["(digitar manualmente)"] + itens_cadastrados)
+                        if item == "(digitar manualmente)":
+                            item = st.text_input("Nome do item")
+                    else:
+                        item = st.text_input("Item")
+
+                    un_compra_default = gestor.obter_unidade_compra(item) if gestor and item else ""
+                    un_receita_default = gestor.obter_unidade_receita(item) if gestor and item else ""
+                    fator = gestor.obter_fator(item) if gestor and item else 1
+
+                    qtd_compra = st.number_input("Quantidade comprada", min_value=0.0, step=1.0, format="%.0f",
+                                                  help=f"Em unidades de compra. Ex: 2 sacos")
+                    un_compra = st.text_input("Unidade de Compra", value=un_compra_default)
+
                 with c2:
+                    un_medida = st.text_input("Unidade de Receita", value=un_receita_default)
+                    qtd_convertida = qtd_compra * fator
+                    st.metric("Quantidade convertida", f"{qtd_convertida:.0f} {un_medida}",
+                              help="Calculado automaticamente pelo fator de conversão")
                     validade = st.date_input("Validade", value=None)
                     lote = st.text_input("Lote")
-                    custo = st.number_input("Custo Unitário", min_value=0.0, step=0.01)
+                    custo = st.number_input("Custo Unitário (por unidade de compra)", min_value=0.0, step=0.01)
 
-            # --- BOTÕES ---
+                qtd = qtd_convertida
+
             btn_col1, btn_col2 = st.columns(2)
             with btn_col1:
                 if st.form_submit_button("✅ Salvar", use_container_width=True):
