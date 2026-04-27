@@ -254,7 +254,7 @@ def _confirmar_producao(row, df_movimentacoes):
             id_producao=row['ID Produção'],
             nome_produto=row['Produto'],
             quantidade=int(float(row['Quantidade'])),
-            data_entrega=row.get['Data Entrega', '']
+            data_entrega=row.get('Data Entrega', '')
         )
 
         # Salva ENT-P no estoque

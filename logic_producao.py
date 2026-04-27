@@ -110,40 +110,33 @@ class CalculadorCustos:
         self.precos = pd.DataFrame(df_precos)
         if not self.precos.empty:
             self.precos.columns = self.precos.columns.str.strip()
-            # Preço vem como string com vírgula (ex: "22,49")
-            self.precos['Preço'] = (
-                self.precos['Preço']
-                .astype(str)
-                .str.replace(',', '.', regex=False)
-                .str.replace(',', '.', regex=False)
-                .str.strip()
-            )
-            self.precos['Preço'] = pd.to_numeric(self.precos['Preço'], errors='coerce').fillna(0)
-            self.precos['Unidade'] = (
-                self.precos['Unidade']
-                .astype(str)
-                .str.replace('.', '', regex=False)
-                .str.replace(',', '.', regex=False)
-                .str.strip()
-            )
-            self.precos['Unidade'] = pd.to_numeric(self.precos['Unidade'], errors='coerce').fillna(1)
 
-            # Custo por unidade de receita (R$/g, R$/ml, R$/un)
+            def parse_numero_br(serie):
+                return (
+                    serie.astype(str)
+                    .str.strip()
+                    .str.replace(r'\s', '', regex=True)
+                    .str.replace('.', '', regex=False)   # remove separador de milhar
+                    .str.replace(',', '.', regex=False)  # vírgula decimal → ponto
+                )
+
+            self.precos['Preço'] = pd.to_numeric(
+                parse_numero_br(self.precos['Preço']), errors='coerce'
+            ).fillna(0)
+
+            self.precos['Unidade'] = pd.to_numeric(
+                parse_numero_br(self.precos['Unidade']), errors='coerce'
+            ).fillna(1)
+
             self.precos['Custo Unitário'] = self.precos['Preço'] / self.precos['Unidade']
             self._idx = self.precos.set_index('Item')
 
-
     def custo_por_unidade(self, item):
-        """Retorna o custo por unidade de receita (g, ml, un)."""
         if item not in self._idx.index:
             return None
         return self._idx.loc[item, 'Custo Unitário']
 
     def calcular_custo_receita(self, insumos):
-        """
-        Recebe lista de dicts com 'item' e 'qtd'.
-        Retorna DataFrame com custo detalhado por insumo e o total.
-        """
         linhas = []
         for insumo in insumos:
             custo_unit = self.custo_por_unidade(insumo['item'])
@@ -157,8 +150,8 @@ class CalculadorCustos:
                 'Item': insumo['item'],
                 'Quantidade': insumo['qtd'],
                 'Unidade': insumo['unidade'],
-                'Custo Unit. (R$/un)': custo_unit,
-                'Custo Total (R$)': custo_total,
+                'Custo Unit. (R$/un)': round(custo_unit, 6) if custo_unit else None,
+                'Custo Total (R$)': round(custo_total, 4) if custo_total else None,
                 'Obs': obs
             })
 
