@@ -111,23 +111,41 @@ class CalculadorCustos:
         if not self.precos.empty:
             self.precos.columns = self.precos.columns.str.strip()
 
-            def parse_numero_br(serie):
-                return (
-                    serie.astype(str)
-                    .str.strip()
-                    .str.replace(r'\s', '', regex=True)
-                    .str.replace('.', '', regex=False)   # remove separador de milhar
-                    .str.replace(',', '.', regex=False)  # vírgula decimal → ponto
+            def parse_numero(serie):
+                """
+                Detecta o formato e converte para float.
+                - "4,19"      → formato BR com vírgula decimal → 4.19
+                - "1.234,56"  → formato BR com milhar → 1234.56
+                - "4.19"      → já é float anglo-saxão → 4.19
+                - "30"        → inteiro puro → 30.0
+                """
+                s = serie.astype(str).str.strip()
+
+                tem_virgula = s.str.contains(',', regex=False)
+                tem_ponto = s.str.contains(r'\.', regex=True)
+
+                resultado = pd.Series(index=s.index, dtype='float64')
+
+                # Formato BR: tem vírgula (pode ter ponto de milhar)
+                mask_br = tem_virgula
+                resultado[mask_br] = pd.to_numeric(
+                    s[mask_br]
+                    .str.replace('.', '', regex=False)   # remove milhar
+                    .str.replace(',', '.', regex=False), # vírgula → ponto
+                    errors='coerce'
                 )
 
-            self.precos['Preço'] = pd.to_numeric(
-                parse_numero_br(self.precos['Preço']), errors='coerce'
-            ).fillna(0)
+                # Formato anglo ou inteiro: não tem vírgula
+                mask_anglo = ~tem_virgula
+                resultado[mask_anglo] = pd.to_numeric(
+                    s[mask_anglo],
+                    errors='coerce'
+                )
 
-            self.precos['Unidade'] = pd.to_numeric(
-                parse_numero_br(self.precos['Unidade']), errors='coerce'
-            ).fillna(1)
+                return resultado
 
+            self.precos['Preço'] = parse_numero(self.precos['Preço']).fillna(0)
+            self.precos['Unidade'] = parse_numero(self.precos['Unidade']).fillna(1)
             self.precos['Custo Unitário'] = self.precos['Preço'] / self.precos['Unidade']
             self._idx = self.precos.set_index('Item')
 

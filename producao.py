@@ -74,6 +74,8 @@ def renderizar_producao():
     df_receitas = carregar_receitas()
     df_movimentacoes = carregar_movimentacoes()
     df_precos = carregar_precos()
+    st.write("Preços brutos:", df_precos[['Item', 'Preço', 'Unidade']].head(10))
+
 
     # --- DASHBOARD DE ORDENS PENDENTES ---
     st.subheader("📋 Ordens de Produção")
