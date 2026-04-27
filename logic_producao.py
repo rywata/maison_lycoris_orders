@@ -39,9 +39,13 @@ class GerenciadorProducao:
         validade_produto = (datetime.now(fuso_brasil) + timedelta(days=4)).strftime("%d/%m/%Y")
 
         linhas = []
+        custo_total_producao = 0.0
+
         for insumo in insumos:
             custo_unit = calculador.custo_por_unidade(insumo['item']) if calculador else 0.0
             custo_unit = custo_unit if custo_unit is not None else 0.0
+
+            custo_total_producao += (custo_unit * insumo['qtd'])
 
             linhas.append(self.gerenciador_mov.preparar_linha(
                 codigo="SAI-P",
@@ -53,6 +57,8 @@ class GerenciadorProducao:
                 validade="",
                 lote=f"Pedido {id_pedido}"
             ))
+        
+        custo_unitario_produto = custo_total_producao / quantidade if quantidade > 0 else 0.0
 
         linhas.append(self.gerenciador_mov.preparar_linha(
             codigo="ENT-P",
@@ -60,8 +66,8 @@ class GerenciadorProducao:
             qtd=quantidade,
             unidade_medida="un",
             unidade_compra="",
-            custo_unitario=0.0,
-            validade=validade_produto,  # <- validade do produto acabado
+            custo_unitario=round(custo_total_producao / quantidade if quantidade > 0 else 0.0),
+            validade=validade_produto,  
             lote=f"Pedido {id_pedido}"
         ))
 
@@ -112,13 +118,6 @@ class CalculadorCustos:
             self.precos.columns = self.precos.columns.str.strip()
 
             def parse_numero(serie):
-                """
-                Detecta o formato e converte para float.
-                - "4,19"      → formato BR com vírgula decimal → 4.19
-                - "1.234,56"  → formato BR com milhar → 1234.56
-                - "4.19"      → já é float anglo-saxão → 4.19
-                - "30"        → inteiro puro → 30.0
-                """
                 s = serie.astype(str).str.strip()
 
                 tem_virgula = s.str.contains(',', regex=False)
@@ -150,9 +149,12 @@ class CalculadorCustos:
             self._idx = self.precos.set_index('Item')
 
     def custo_por_unidade(self, item):
-        if item not in self._idx.index:
-            return None
-        return self._idx.loc[item, 'Custo Unitário']
+        item_upper = str(item).strip().upper()
+
+        if not hasattr(self, '_idx_upper'):
+            self._idx_upper = {str(k).upper(): v for k, v in self._idx['Custo Unitário'].to_dict().items()}
+        
+        return self._idx_upper.get(item_upper, None)
 
     def calcular_custo_receita(self, insumos):
         linhas = []
