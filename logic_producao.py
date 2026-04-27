@@ -1,5 +1,5 @@
 import pandas as pd
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import pytz
 from logic_estoque import GerenciadorMovimentacao
 
@@ -35,6 +35,9 @@ class GerenciadorProducao:
         if insumos is None:
             return None, f"Receita não encontrada para '{nome_produto}'"
 
+        # Validade = hoje + 4 dias
+        validade_produto = (datetime.now(fuso_brasil) + timedelta(days=4)).strftime("%d/%m/%Y")
+
         linhas = []
         for insumo in insumos:
             custo_unit = calculador.custo_por_unidade(insumo['item']) if calculador else 0.0
@@ -58,7 +61,7 @@ class GerenciadorProducao:
             unidade_medida="un",
             unidade_compra="",
             custo_unitario=0.0,
-            validade="",
+            validade=validade_produto,  # <- validade do produto acabado
             lote=f"Pedido {id_pedido}"
         ))
 
@@ -112,13 +115,23 @@ class CalculadorCustos:
                 self.precos['Preço']
                 .astype(str)
                 .str.replace(',', '.', regex=False)
+                .str.replace(',', '.', regex=False)
                 .str.strip()
             )
             self.precos['Preço'] = pd.to_numeric(self.precos['Preço'], errors='coerce').fillna(0)
+            self.precos['Unidade'] = (
+                self.precos['Unidade']
+                .astype(str)
+                .str.replace('.', '', regex=False)
+                .str.replace(',', '.', regex=False)
+                .str.strip()
+            )
             self.precos['Unidade'] = pd.to_numeric(self.precos['Unidade'], errors='coerce').fillna(1)
-            # Custo por unidade de receita (ex: R$/g, R$/ml, R$/un)
+
+            # Custo por unidade de receita (R$/g, R$/ml, R$/un)
             self.precos['Custo Unitário'] = self.precos['Preço'] / self.precos['Unidade']
             self._idx = self.precos.set_index('Item')
+
 
     def custo_por_unidade(self, item):
         """Retorna o custo por unidade de receita (g, ml, un)."""
