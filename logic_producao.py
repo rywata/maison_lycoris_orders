@@ -36,13 +36,15 @@ class GerenciadorProducao:
             return None, f"Receita não encontrada para '{nome_produto}'"
 
         linhas = []
-
         for insumo in insumos:
             linhas.append(self.gerenciador_mov.preparar_linha(
                 codigo="SAI-P",
                 item=insumo['item'],
                 qtd=insumo['qtd'],
                 unidade_medida=insumo['unidade'],
+                unidade_compra="",       # explícito
+                custo_unitario=0.0,      # explícito
+                validade="",             # explícito
                 lote=f"Pedido {id_pedido}"
             ))
 
@@ -51,6 +53,9 @@ class GerenciadorProducao:
             item=nome_produto,
             qtd=quantidade,
             unidade_medida="un",
+            unidade_compra="",
+            custo_unitario=0.0,
+            validade="",
             lote=f"Pedido {id_pedido}"
         ))
 

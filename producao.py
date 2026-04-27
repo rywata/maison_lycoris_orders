@@ -61,71 +61,57 @@ def renderizar_producao():
     df_receitas = carregar_receitas()
     df_movimentacoes = carregar_movimentacoes()
 
-    # --- PEDIDOS PENDENTES DE CONFIRMAÇÃO ---
+    # --- DASHBOARD DE ORDENS PENDENTES ---
+    st.subheader("📋 Ordens de Produção")
+
     if not df_producao.empty:
-        analisador = AnalisadorProducao(df_producao)
+        pendentes = df_producao[df_producao['Status'] == 'Pendente'].copy()
+        concluidos = df_producao[df_producao['Status'].isin(['Concluído', 'Entregue'])].copy()
 
-        pendentes = df_producao[df_producao['Status'] == 'Pendente']
+        # Métricas rápidas
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Pendentes", len(pendentes))
+        m2.metric("Concluídos", len(concluidos))
+        m3.metric("Total", len(df_producao))
 
+        st.divider()
+
+        # --- PENDENTES ---
         if not pendentes.empty:
-            st.subheader("⏳ Aguardando confirmação de produção")
-            st.caption("Confirme quando o produto estiver pronto. O estoque será atualizado automaticamente.")
+            st.markdown("### ⏳ Aguardando produção")
 
             for _, row in pendentes.iterrows():
-                with st.container():
-                    c1, c2, c3, c4, c5 = st.columns([2, 2, 1, 1, 1])
-                    c1.write(f"**{row['Produto']}**")
-                    c2.write(f"Pedido `{row['ID Pedido']}`")
-                    c3.write(f"{int(float(row['Quantidade']))} un")
-                    c4.write(f"Entrega: {row['Data Entrega']}")
+                with st.container(border=True):
+                    c1, c2, c3, c4 = st.columns([3, 2, 2, 1])
 
-                    if c5.button("✅ Confirmar", key=f"confirmar_{row['ID Produção']}",
-                                 use_container_width=True):
-                        try:
-                            from logic_producao import GerenciadorStatusProducao
-                            gestor_status = GerenciadorStatusProducao(df_producao, df_movimentacoes)
+                    with c1:
+                        st.markdown(f"**{row['Produto']}**")
+                        st.caption(f"Pedido `{row['ID Pedido']}`")
 
-                            linha_mov, novo_status = gestor_status.confirmar_producao(
-                                id_producao=row['ID Produção'],
-                                nome_produto=row['Produto'],
-                                quantidade=int(float(row['Quantidade'])),
-                                data_entrega=row['Data Entrega']
-                            )
+                    with c2:
+                        st.metric("Quantidade", f"{int(float(row['Quantidade']))} un")
 
-                            db = Database()
-                            aba_mov = db.conectar_aba("Controle", "Movimentações")
-                            aba_prod = db.conectar_aba("Controle", "Produção")
+                    with c3:
+                        st.metric("Entrega", row['Data Entrega'])
 
-                            # Salva ENT-P no estoque
-                            aba_mov.append_row(linha_mov)
-
-                            # Atualiza status na aba Produção
-                            # Encontra a linha na planilha pelo ID
-                            todos = aba_prod.get_all_values()
-                            headers = todos[0]
-                            col_id = headers.index('ID Produção') + 1
-                            col_status = headers.index('Status') + 1
-
-                            for i, linha in enumerate(todos[1:], start=2):
-                                if linha[col_id - 1] == row['ID Produção']:
-                                    aba_prod.update_cell(i, col_status, novo_status)
-                                    break
-
-                            st.success(f"Produção de {row['Produto']} confirmada! Status: {novo_status}")
-                            st.cache_data.clear()
-                            st.rerun()
-
-                        except Exception as e:
-                            st.error(f"Erro ao confirmar produção: {e}")
+                    with c4:
+                        if st.button("✅ Concluir", key=f"concluir_{row['ID Produção']}",
+                                     use_container_width=True, type="primary"):
+                            _confirmar_producao(row, df_movimentacoes)
 
             st.divider()
 
-        # --- RESUMO GERAL ---
-        st.subheader("Produção por produto")
-        st.dataframe(analisador.producao_por_produto, use_container_width=True, hide_index=True)
+        # --- CONCLUÍDOS RECENTES ---
+        if not concluidos.empty:
+            with st.expander(f"✅ Histórico de produções concluídas ({len(concluidos)})"):
+                st.dataframe(
+                    concluidos.sort_values('Data Produção', ascending=False),
+                    use_container_width=True,
+                    hide_index=True
+                )
 
     else:
-        st.info("Nenhuma produção registrada ainda.")
+        st.info("Nenhuma ordem de produção registrada. Elas aparecem aqui quando um pedido é finalizado.")
 
     st.divider()
 
@@ -162,8 +148,10 @@ def renderizar_producao():
                 insumos = produtor.calcular_insumos(produto, quantidade)
                 if insumos:
                     st.markdown("**Insumos que serão baixados do estoque:**")
-                    st.dataframe(pd.DataFrame(insumos, columns=['Item', 'Quantidade', 'Unidade']),
-                                 use_container_width=True, hide_index=True)
+                    st.dataframe(
+                        pd.DataFrame(insumos, columns=['Item', 'Quantidade', 'Unidade']),
+                        use_container_width=True, hide_index=True
+                    )
 
             btn1, btn2 = st.columns(2)
             with btn1:
@@ -183,7 +171,6 @@ def renderizar_producao():
                             ordem = produtor.gerar_ordem_producao(
                                 id_ref_final, produto, quantidade, data_entrega.isoformat()
                             )
-                            # Produção manual já nasce como Concluído
                             ordem[-1] = "Concluído"
                             aba_prod.append_row(ordem)
                             aba_mov.append_rows(linhas_mov, value_input_option='USER_ENTERED')
@@ -214,6 +201,43 @@ def renderizar_producao():
         st.metric("Produções encontradas", len(df_filtrado))
         st.dataframe(
             df_filtrado.sort_values('Data Produção', ascending=False),
-            use_container_width=True,
-            hide_index=True
+            use_container_width=True, hide_index=True
         )
+
+
+def _confirmar_producao(row, df_movimentacoes):
+    try:
+        from logic_producao import GerenciadorStatusProducao
+
+        db = Database()
+        aba_mov = db.conectar_aba("Controle", "Movimentações")
+        aba_prod = db.conectar_aba("Controle", "Produção")
+
+        gestor = GerenciadorStatusProducao(pd.DataFrame(), df_movimentacoes)
+        linha_mov, novo_status = gestor.confirmar_producao(
+            id_producao=row['ID Produção'],
+            nome_produto=row['Produto'],
+            quantidade=int(float(row['Quantidade'])),
+            data_entrega=row['Data Entrega']
+        )
+
+        # Salva ENT-P no estoque
+        aba_mov.append_row(linha_mov)
+
+        # Atualiza status na aba Produção
+        todos = aba_prod.get_all_values()
+        headers = todos[0]
+        col_id = headers.index('ID Produção') + 1
+        col_status = headers.index('Status') + 1
+
+        for i, linha in enumerate(todos[1:], start=2):
+            if linha[col_id - 1] == row['ID Produção']:
+                aba_prod.update_cell(i, col_status, novo_status)
+                break
+
+        st.success(f"✅ {row['Produto']} marcado como {novo_status}!")
+        st.cache_data.clear()
+        st.rerun()
+
+    except Exception as e:
+        st.error(f"Erro ao confirmar produção: {e}")

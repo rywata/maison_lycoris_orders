@@ -18,7 +18,10 @@ class GerenciadorMovimentacao:
         else:
             proximo_sequencial = 1
 
-        return f"{prefixo}{hoje_str}{proximo_sequencial:05d}"
+        novo_id = f"{prefixo}{hoje_str}{proximo_sequencial:05d}"
+        nova_linha = pd.DataFrame([{'ID Mov.': novo_id}])
+        self.df = pd.concat([self.df, nova_linha], ignore_index=True)
+        return novo_id
 
     def preparar_linha(self, codigo, item, qtd, unidade_medida, unidade_compra="", custo_unitario=0.0, validade="", lote=""):
         id_mov = self.gerar_id_unico(codigo)
