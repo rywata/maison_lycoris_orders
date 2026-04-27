@@ -79,3 +79,35 @@ class GestorRegras:
 
     def obter_fator(self, item):
         return self.regras.get(item, {}).get('Fator Conversão', 1)
+
+class BuscaEstoque:
+    def __init__(self, df):
+        self._df = df
+        self.df_filtrado = df.copy()
+
+    def filtrar(self, item="", tipo="Todos", data_inicio=None, data_fim=None):
+        temp = self._df.copy()
+
+        if item:
+            temp = temp[temp['Item'].str.contains(item, case=False, na=False)]
+
+        if tipo != "Todos":
+            temp = temp[temp['Tipo'] == tipo]
+
+        if data_inicio:
+            temp = temp[temp['Data Mov.'] >= pd.Timestamp(data_inicio)]
+
+        if data_fim:
+            temp = temp[temp['Data Mov.'] <= pd.Timestamp(data_fim)]
+
+        self.df_filtrado = temp
+
+    @property
+    def total_entradas(self):
+        mask = self.df_filtrado['Quantidade'] > 0
+        return self.df_filtrado.loc[mask, 'Quantidade'].sum()
+
+    @property
+    def total_saidas(self):
+        mask = self.df_filtrado['Quantidade'] < 0
+        return self.df_filtrado.loc[mask, 'Quantidade'].sum()

@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from database import Database
-from logic_estoque import AnalisadorEstoque, GerenciadorMovimentacao
+from logic_estoque import AnalisadorEstoque, GerenciadorMovimentacao, BuscaEstoque
 from datetime import datetime
 
 def carregar_dados_estoque():
@@ -30,6 +30,46 @@ def renderizar_estoque():
         st.dataframe(analisador.saldo_atual, use_container_width=True)
 
     st.divider()
+
+    # --- BUSCA ---
+    st.subheader("🔍 Buscar movimentações")
+
+    if not df_movimentacoes.empty:
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            filtro_item = st.text_input("Filtrar por item", placeholder="Ex: Farinha")
+        with col2:
+            tipos = ["Todos"] + sorted(df_movimentacoes['Tipo'].dropna().unique().tolist())
+            filtro_tipo = st.selectbox("Tipo de movimentação", tipos)
+        with col3:
+            filtro_data = st.date_input("Data início", value=None)
+
+        # Aplica filtros via BuscaEstoque
+        buscador = BuscaEstoque(AnalisadorEstoque(df_movimentacoes).df)
+        buscador.filtrar(
+            item=filtro_item,
+            tipo=filtro_tipo,
+            data_inicio=filtro_data if filtro_data else None,
+        )
+
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Registros encontrados", len(buscador.df_filtrado))
+        m2.metric("Total entradas", f"{buscador.total_entradas:.3f}")
+        m3.metric("Total saídas", f"{abs(buscador.total_saidas):.3f}")
+
+        st.dataframe(
+            buscador.df_filtrado.sort_values('Data Mov.', ascending=False),
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
+        st.info("Sem dados para buscar.")
+
+    st.divider()
+
+
+
     st.subheader("Registrar Movimentação")
 
     col1, col2, col3, col4 = st.columns(4)
