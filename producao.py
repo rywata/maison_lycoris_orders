@@ -48,6 +48,19 @@ def carregar_movimentacoes():
         st.error(f"Erro ao acessar aba de Movimentações: {e}")
         return pd.DataFrame()
 
+@st.cache_data(ttl=300)
+def carregar_precos():
+    try:
+        db = Database()
+        aba = db.conectar_aba("Controle", "Preço Insumos")
+        dados = aba.get_all_records()
+        df = pd.DataFrame(dados)
+        if not df.empty:
+            df.columns = df.columns.str.strip()
+        return df
+    except Exception as e:
+        st.error(f"Erro ao acessar Preço Insumos: {e}")
+        return pd.DataFrame()
 
 def renderizar_producao():
     st.title("🏗️ Gestão de Produção")
@@ -60,6 +73,7 @@ def renderizar_producao():
     df_producao = carregar_dados_producao()
     df_receitas = carregar_receitas()
     df_movimentacoes = carregar_movimentacoes()
+    df_precos = carregar_precos()
 
     # --- DASHBOARD DE ORDENS PENDENTES ---
     st.subheader("📋 Ordens de Produção")
@@ -82,23 +96,42 @@ def renderizar_producao():
 
             for _, row in pendentes.iterrows():
                 with st.container(border=True):
-                    c1, c2, c3, c4 = st.columns([3, 2, 2, 1])
+                    c1, c2, c3, c4 = st.columns([4, 2, 2, 2])
 
                     with c1:
                         st.markdown(f"**{row['Produto']}**")
                         st.caption(f"Pedido `{row['ID Pedido']}`")
 
+                        # Custo estimado da ordem
+                        if not df_receitas.empty and not df_precos.empty:
+                            from logic_producao import CalculadorCustos, GerenciadorProducao
+                            produtor = GerenciadorProducao(df_receitas, df_movimentacoes)
+                            calc = CalculadorCustos(df_precos)
+                            insumos = produtor.calcular_insumos(
+                                row['Produto'], int(float(row['Quantidade']))
+                            )
+                            if insumos:
+                                _, total = calc.calcular_custo_receita(insumos)
+                                st.caption(f"Custo estimado: **R$ {total:.2f}**")
+
                     with c2:
-                        st.metric("Quantidade", f"{int(float(row['Quantidade']))} un")
+                        st.markdown("**Quantidade**")
+                        st.markdown(f"{int(float(row['Quantidade']))} un")
 
                     with c3:
-                        data_entrega_str = row.get('Data Entrega', '-')
-                        st.metric("Entrega", data_entrega_str])
+                        st.markdown("**Entrega**")
+                        data_fmt = row.get('Data Entrega', '—')
+                        st.markdown(f"`{data_fmt}`")
 
                     with c4:
-                        if st.button("✅ Concluir", key=f"concluir_{row['ID Produção']}",
-                                     use_container_width=True, type="primary"):
-                            _confirmar_producao(row, df_movimentacoes)
+                        st.button(
+                            "✅ Concluir produção",
+                            key=f"concluir_{row['ID Produção']}",
+                            use_container_width=True,
+                            type="primary",
+                            on_click=_confirmar_producao,
+                            args=(row, df_movimentacoes)
+                        )
 
             st.divider()
 
@@ -146,13 +179,17 @@ def renderizar_producao():
 
             if produto:
                 produtor = GerenciadorProducao(df_receitas, df_movimentacoes)
+                calc = CalculadorCustos(df_precos)
                 insumos = produtor.calcular_insumos(produto, quantidade)
                 if insumos:
-                    st.markdown("**Insumos que serão baixados do estoque:**")
+                    df_custos, total = calc.calcular_custo_receita(insumos)
+                    st.markdown("**Insumos e custos estimados:**")
                     st.dataframe(
-                        pd.DataFrame(insumos, columns=['Item', 'Quantidade', 'Unidade']),
-                        use_container_width=True, hide_index=True
+                        df_custos[['Item', 'Quantidade', 'Unidade', 'Custo Total (R$)']],
+                        use_container_width=True,
+                        hide_index=True
                     )
+                    st.metric("Custo total estimado", f"R$ {total:.2f}")
 
             btn1, btn2 = st.columns(2)
             with btn1:

@@ -141,28 +141,32 @@ def renderizar_novo_pedido():
                         aba_mov = db.conectar_aba("Controle", "Movimentações")
                         aba_prod = db.conectar_aba("Controle", "Produção")
                         aba_receitas = db.conectar_aba("Controle", "Receitas Python")
+                        aba_precos = db.conectar_aba("Controle", "Preço Insumos")  # <- novo
 
                         df_mov = pd.DataFrame(aba_mov.get_all_records())
                         df_receitas = pd.DataFrame(aba_receitas.get_all_records())
+                        df_precos = pd.DataFrame(aba_precos.get_all_records())     # <- novo
+
+                        from logic_producao import CalculadorCustos               # <- novo
+                        calc = CalculadorCustos(df_precos)                        # <- novo
 
                         produtor = GerenciadorProducao(df_receitas, df_mov)
 
-                        todas_mov = []   
-                        todas_prod = []  
+                        todas_mov = []
+                        todas_prod = []
 
                         for _, row in df_editado.iterrows():
-                            # Baixa ingredientes do estoque imediatamente
                             linhas_mov, erro = produtor.gerar_movimentacoes(
                                 id_pedido=id_p,
                                 nome_produto=row['produto'].upper(),
-                                quantidade=int(row['qtd'])
+                                quantidade=int(row['qtd']),
+                                calculador=calc    # <- novo
                             )
                             if erro:
                                 st.warning(f"⚠️ {row['produto']}: {erro}. Estoque não movimentado.")
                                 continue
 
                             todas_mov.extend(linhas_mov[:-1])
-
                             todas_prod.append(produtor.gerar_ordem_producao(
                                 id_pedido=id_p,
                                 nome_produto=row['produto'],
