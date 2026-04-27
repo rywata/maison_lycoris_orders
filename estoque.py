@@ -45,7 +45,6 @@ def renderizar_estoque():
         with col3:
             filtro_data = st.date_input("Data início", value=None)
 
-        # Aplica filtros via BuscaEstoque
         buscador = BuscaEstoque(AnalisadorEstoque(df_movimentacoes).df)
         buscador.filtrar(
             item=filtro_item,
@@ -53,10 +52,20 @@ def renderizar_estoque():
             data_inicio=filtro_data if filtro_data else None,
         )
 
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Registros encontrados", len(buscador.df_filtrado))
-        m2.metric("Total entradas", f"{buscador.total_entradas:.3f}")
-        m3.metric("Total saídas", f"{abs(buscador.total_saidas):.3f}")
+        st.metric("Registros encontrados", len(buscador.df_filtrado))
+
+        resumo = buscador.resumo_por_item
+        if not resumo.empty:
+            if buscador.item_unico:
+                row = resumo.iloc[0]
+                un = row['Unidade de Medida']
+                m1, m2, m3 = st.columns(3)
+                m1.metric("Entradas", f"{row['Entradas']:.3f} {un}")
+                m2.metric("Saídas", f"{row['Saídas']:.3f} {un}")
+                m3.metric("Saldo no período", f"{row['Saldo período']:.3f} {un}")
+            else:
+                st.caption("Totais por item — unidades diferentes não podem ser somadas.")
+                st.dataframe(resumo, use_container_width=True, hide_index=True)
 
         st.dataframe(
             buscador.df_filtrado.sort_values('Data Mov.', ascending=False),
@@ -72,8 +81,7 @@ def renderizar_estoque():
 
     st.subheader("Registrar Movimentação")
 
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
-
+    col1, col2, col3 = st.columns(3)
     if col1.button("📥 Compra (ENT-C)", use_container_width=True):
         st.session_state.tipo_mov = "ENT-C"
         st.session_state.mostrar_form = True
@@ -83,10 +91,12 @@ def renderizar_estoque():
     if col3.button("🍞 Entrada Prod (ENT-P)", use_container_width=True):
         st.session_state.tipo_mov = "ENT-P"
         st.session_state.mostrar_form = True
+
+    col4, col5, col6 = st.columns(3)
     if col4.button("💰 Venda (SAI-V)", use_container_width=True):
         st.session_state.tipo_mov = "SAI-V"
         st.session_state.mostrar_form = True
-    if col5.button("🛠️ Ajuste Entrada(ENT-A)", use_container_width=True):
+    if col5.button("🛠️ Ajuste Entrada (ENT-A)", use_container_width=True):
         st.session_state.tipo_mov = "ENT-A"
         st.session_state.mostrar_form = True
     if col6.button("🛠️ Ajuste Saída (SAI-A)", use_container_width=True):
