@@ -53,7 +53,7 @@ class GerenciadorProducao:
                 qtd=insumo['qtd'],
                 unidade_medida=insumo['unidade'],
                 unidade_compra="",
-                custo_unitario=round(custo_unit, 6),
+                custo_unitario=round(custo_unit, 4),
                 validade="",
                 lote=f"Pedido {id_pedido}"
             ))
@@ -86,21 +86,23 @@ class GerenciadorProducao:
         ]
 
 class GerenciadorStatusProducao:
-    def __init__(self, df_producao, df_movimentacoes, calculador=None):
+    def __init__(self, df_producao, df_movimentacoes, calculador=None, df_receitas=None):
         self.df_producao = df_producao.copy()
         self.gerenciador_mov = GerenciadorMovimentacao(df_movimentacoes)
         self.calculador = calculador
+        self.df_receitas = df_receitas
 
     def confirmar_producao(self, id_producao, nome_produto, quantidade, data_entrega):
         hoje = date.today()
 
         # Calcula custo unitário do produto acabado
         custo_unitario_produto = 0.0
-        if self.calculador:
-            from logic_producao import GerenciadorProducao
-            # Não temos df_receitas aqui, então o custo do ENT-P
-            # fica zerado — é calculado na SAI-P dos ingredientes
-            pass
+        if self.calculador and self.df_receitas is not None:
+            produtor_temp = GerenciadorProducao(self.df_receitas, pd.DataFrame())
+            insumos = produtor_temp.calcular_insumos(nome_produto, quantidade)
+            if insumos:
+                _, custo_total = self.calculador.calcular_custo_receita(insumos)
+                custo_unitario_produto = custo_total / quantidade if quantidade > 0 else 0.0
 
         validade_produto = (datetime.now(fuso_brasil) + timedelta(days=4)).strftime("%d/%m/%Y")
 
@@ -134,12 +136,13 @@ class CalculadorCustos:
             self.precos['Unidade'] = self.precos['Unidade'].replace(0, 1)
             self.precos['Custo Unitário'] = self.precos['Preço'] / self.precos['Unidade']
             self._idx = self.precos.set_index('Item')
+            self.mapa_itens_upper = {str(k).strip().upper()}
 
     def custo_por_unidade(self, item):
         item_busca = str(item).strip().upper()
         chave = {str(k).strip().upper(): k for k in self._idx.index}
         if item_busca not in chave:
-            return None
+            return 0.0
         return self._idx.loc[chave[item_busca], 'Custo Unitário']
 
     def calcular_custo_receita(self, insumos):

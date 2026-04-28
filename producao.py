@@ -135,7 +135,7 @@ def renderizar_producao():
                             use_container_width=True,
                             type="primary",
                             on_click=_confirmar_producao,
-                            args=(row, df_movimentacoes, df_precos)  # <- passa df_precos
+                            args=(row, df_movimentacoes, df_precos, df_receitas)  # <- passa df_precos
                         )
 
             st.divider()
@@ -257,7 +257,7 @@ def renderizar_producao():
         )
 
 
-def _confirmar_producao(row, df_movimentacoes, df_precos):
+def _confirmar_producao(row, df_movimentacoes, df_precos, df_receitas):
     try:
         from logic_producao import GerenciadorStatusProducao, CalculadorCustos
 
@@ -265,14 +265,18 @@ def _confirmar_producao(row, df_movimentacoes, df_precos):
         aba_mov = db.conectar_aba("Controle", "Movimentações")
         aba_prod = db.conectar_aba("Controle", "Produção")
 
-        # Busca preços frescos sem cache
         aba_precos = db.conectar_aba("Controle", "Preço Insumos")
         df_precos_fresh = pd.DataFrame(
             aba_precos.get_all_records(value_render_option='UNFORMATTED_VALUE')
         )
         calc = CalculadorCustos(df_precos_fresh)
 
-        gestor = GerenciadorStatusProducao(pd.DataFrame(), df_movimentacoes, calc)
+        gestor = GerenciadorStatusProducao(
+            pd.DataFrame(),
+            df_movimentacoes,
+            calculador=calc,
+            df_receitas=df_receitas
+        )
         linha_mov, novo_status = gestor.confirmar_producao(
             id_producao=row['ID Produção'],
             nome_produto=row['Produto'],
@@ -292,7 +296,6 @@ def _confirmar_producao(row, df_movimentacoes, df_precos):
                 aba_prod.update_cell(i, col_status, novo_status)
                 break
 
-        # Sinaliza para o rerun acontecer fora do callback
         st.session_state._producao_confirmada = True
         st.session_state._producao_msg = f"✅ {row['Produto']} marcado como {novo_status}!"
 
