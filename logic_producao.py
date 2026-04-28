@@ -136,14 +136,15 @@ class CalculadorCustos:
             self.precos['Unidade'] = self.precos['Unidade'].replace(0, 1)
             self.precos['Custo Unitário'] = self.precos['Preço'] / self.precos['Unidade']
             self._idx = self.precos.set_index('Item')
-            self.mapa_itens_upper = {str(k).strip().upper(): k for k in self._idx.index}
+            self.mapa_itens_upper = {
+                str(k).strip().upper(): k for k in self._idx.index}
 
     def custo_por_unidade(self, item):
         item_busca = str(item).strip().upper()
         item_original = self.mapa_itens_upper.get(item_busca)
-        if item_busca not in item_original:
-            return 0.0
-        return self._idx.loc[item_original, 'Custo Unitário']
+        if item_original and item_original in self._idx.index:
+            return float(self._idx.loc[item_original, 'Custo Unitário'])
+        return 0.0
 
     def calcular_custo_receita(self, insumos):
         linhas = []
