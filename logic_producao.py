@@ -66,7 +66,7 @@ class GerenciadorProducao:
             qtd=quantidade,
             unidade_medida="un",
             unidade_compra="",
-            custo_unitario=round(custo_total_producao / quantidade if quantidade > 0 else 0.0),
+            custo_unitario=round(float(custo_unitario_produto), 4),
             validade=validade_produto,  
             lote=f"Pedido {id_pedido}"
         ))
@@ -112,7 +112,7 @@ class GerenciadorStatusProducao:
             qtd=quantidade,
             unidade_medida="un",
             unidade_compra="",
-            custo_unitario=0.0,
+            custo_unitario=round(float(custo_unitario_produto), 4),
             validade=validade_produto,
             lote=f"Produção {id_producao}"
         )
