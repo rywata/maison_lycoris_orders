@@ -2,8 +2,16 @@ import pandas as pd
 from datetime import datetime, date, timedelta
 import pytz
 from logic_estoque import GerenciadorMovimentacao
+import unicodedata
 
 fuso_brasil = pytz.timezone('America/Sao_Paulo')
+
+def normalizar(texto):
+    texto = str(texto).strip().upper()
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', texto)
+        if unicodedata.category(c) != 'Mn'
+    )
 
 class GerenciadorProducao:
     def __init__(self, df_receitas, df_movimentacoes):
@@ -42,8 +50,10 @@ class GerenciadorProducao:
         custo_total_producao = 0.0
 
         for insumo in insumos:
-            custo_unit = calculador.custo_por_unidade(insumo['item']) if calculador else 0.0
-            custo_unit = custo_unit if custo_unit is not None else 0.0
+            custo_unit = calculador.custo_por_unidade(insumo['item']) if calculador else None
+
+            if custo_unit is None:
+                custo_unit = 0.0
 
             custo_total_producao += (custo_unit * insumo['qtd'])
 
@@ -129,22 +139,38 @@ class GerenciadorStatusProducao:
 class CalculadorCustos:
     def __init__(self, df_precos):
         self.precos = pd.DataFrame(df_precos)
+
         if not self.precos.empty:
             self.precos.columns = self.precos.columns.str.strip()
-            self.precos['Preço'] = pd.to_numeric(self.precos['Preço'], errors='coerce').fillna(0)
-            self.precos['Unidade'] = pd.to_numeric(self.precos['Unidade'], errors='coerce').fillna(1)
+
+            self.precos['Preço'] = pd.to_numeric(
+                self.precos['Preço'], errors='coerce'
+            ).fillna(0)
+
+            self.precos['Unidade'] = pd.to_numeric(
+                self.precos['Unidade'], errors='coerce'
+            ).fillna(1)
+
             self.precos['Unidade'] = self.precos['Unidade'].replace(0, 1)
-            self.precos['Custo Unitário'] = self.precos['Preço'] / self.precos['Unidade']
+
+            self.precos['Custo Unitário'] = (
+                self.precos['Preço'] / self.precos['Unidade']
+            )
+
             self._idx = self.precos.set_index('Item')
-            self.mapa_itens_upper = {
-                str(k).strip().upper(): k for k in self._idx.index}
+
+            self.mapa_itens = {
+                normalizar(k): k for k in self._idx.index
+            }
 
     def custo_por_unidade(self, item):
-        item_busca = str(item).strip().upper()
-        item_original = self.mapa_itens_upper.get(item_busca)
+        item_norm = normalizar(item)
+        item_original = self.mapa_itens.get(item_norm)
+
         if item_original and item_original in self._idx.index:
             return float(self._idx.loc[item_original, 'Custo Unitário'])
-        return 0.0
+
+        return None
 
     def calcular_custo_receita(self, insumos):
         linhas = []
@@ -152,18 +178,23 @@ class CalculadorCustos:
 
         for insumo in insumos:
             custo_unit = self.custo_por_unidade(insumo['item'])
+
             if custo_unit is None:
                 custo_total_insumo = 0.0
                 obs = "⚠️ Preço não cadastrado"
+                custo_unit_exibir = 0.0
             else:
                 custo_total_insumo = custo_unit * insumo['qtd']
                 obs = ""
+                custo_unit_exibir = round(custo_unit, 6)
+
             custo_total_geral += custo_total_insumo
+
             linhas.append({
                 'Item': insumo['item'],
                 'Quantidade': insumo['qtd'],
                 'Unidade': insumo['unidade'],
-                'Custo Unit. (R$/un)': round(custo_unit, 6) if custo_unit else 0.0,
+                'Custo Unit. (R$/un)': custo_unit_exibir,
                 'Custo Total (R$)': round(custo_total_insumo, 4),
                 'Obs': obs
             })
