@@ -29,10 +29,12 @@ class GerenciadorProducao:
         receita = self.receitas[mask]
         if receita.empty:
             return None
+        rendimento = 14 if "PASTEL" in nome_produto.upper() else 1
+        fator_multiplicador = quantidade / rendimento
         return [
             {
                 'item': row['Item (Insumo)'],
-                'qtd': row['Qtd_Receita'] * quantidade,
+                'qtd': row['Qtd_Receita'] * fator_multiplicador,
                 'unidade': row['Unidade']
             }
             for _, row in receita.iterrows()
