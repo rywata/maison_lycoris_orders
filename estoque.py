@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from database import Database
-from logic_estoque import GestorRegras
+from logic_estoque import GerenciadorMovimentacao as GestorRegras
 from datetime import datetime
 import pytz
 

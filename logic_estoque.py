@@ -126,3 +126,5 @@ class BuscaEstoque:
         resumo = pd.merge(entradas, saidas, on=['item', 'unidade_medida'], how='outer').fillna(0)
         resumo['saldo_periodo'] = resumo['entradas'] - resumo['saidas']
         return resumo
+
+GestorRegras = GerenciadorMovimentacao
