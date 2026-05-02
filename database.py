@@ -129,10 +129,79 @@ class Database:
 
     # --- CADASTROS ---
     def insumos(self):
-        return self.buscar("cadastro_insumos")
+        df = self.buscar("cadastro_insumos")
+        mapeamento = {
+            'item': 'Item',
+            'unidade_compra': 'Unidade Compra',
+            'unidade_receita': 'Unidade Receita',
+            'fator_conversao': 'Fator Conversão',
+            'estoque_minimo': 'Estoque Mínimo'
+        }
+        return df.rename(columns=mapeamento)
 
     def precos(self):
-        return self.buscar("preco_insumos")
+        df = self.buscar("preco_insumos")
+        mapeamento = {
+            'item': 'Item',
+            'preco': 'Preço',
+            'unidade': 'Unidade',
+            'marca': 'Marca'
+        }
+        return df.rename(columns=mapeamento)
 
     def receitas(self):
-        return self.buscar("receitas")
+        df = self.buscar("receitas")
+        mapeamento = {
+            'cod_produto': 'cod_produto',
+            'produto': 'Produto',
+            'item_insumo': 'Item (Insumo)',
+            'qtd_receita': 'Qtd_Receita',
+            'unidade': 'Unidade'
+        }
+        return df.rename(columns=mapeamento)
+
+    # --- OPERACIONAL ---
+    def pedidos(self):
+        df = self.buscar("pedidos")
+        mapeamento = {
+            'id_pedido': 'ID Pedido',
+            'nome_cliente': 'Nome Cliente',
+            'data_entrega': 'Data Entrega',
+            'produto': 'Produto',
+            'quantidade': 'Quantidade',
+            'total_item_bruto': 'Total Item Bruto',
+            'desconto': 'Desconto',
+            'total_item_liquido': 'Total Item Líquido',
+            'data_pedido': 'Data Pedido'
+        }
+        return df.rename(columns=mapeamento)
+
+    def movimentacoes(self):
+        df = self.buscar("movimentacoes")
+        mapeamento = {
+            'id_mov': 'ID Mov.',
+            'data_mov': 'Data Mov.',
+            'tipo': 'Tipo',
+            'item': 'Item',
+            'quantidade': 'Quantidade',
+            'unidade_de_medida': 'Unidade de Medida',
+            'unidade_de_compra': 'Unidade de Compra',
+            'validade': 'Validade',
+            'lote': 'Lote',
+            'custo_unitario': 'Custo Unitário',
+            'custo_total': 'Custo Total'
+        }
+        return df.rename(columns=mapeamento)
+
+    def producao(self):
+        df = self.buscar("producao")
+        mapeamento = {
+            'id_producao': 'ID Produção',
+            'id_pedido': 'ID Pedido',
+            'data_producao': 'Data Produção',
+            'produto': 'Produto',
+            'quantidade': 'Quantidade',
+            'data_entrega': 'Data Entrega',
+            'status': 'Status'
+        }
+        return df.rename(columns=mapeamento)
