@@ -20,12 +20,12 @@ def renderizar_historico():
     
     df['data_pedido'] = pd.to_datetime(df['data_pedido'], errors='coerce').dt.date
     df['data_entrega'] = pd.to_datetime(df['data_entrega'], errors='coerce').dt.date
+    
     df['total_liquido'] = pd.to_numeric(df['total_liquido'], errors='coerce').fillna(0)
 
     # --- FILTROS NA SIDEBAR ---
     with st.sidebar:
         st.header("🔍 Filtros")
-
         busca_nome = st.text_input("Nome do Cliente").strip()
 
         produtos_disponiveis = ["Todos"] + sorted(df['produto'].dropna().unique().tolist())
@@ -34,8 +34,9 @@ def renderizar_historico():
         datas_validas = df['data_pedido'].dropna()
         
         if not datas_validas.empty:
-            data_min_calc = datas_validas.min()
-            data_max_calc = datas_validas.max()
+            lista_datas = list(datas_validas)
+            data_min_calc = min(lista_datas)
+            data_max_calc = max(lista_datas)
         else:
             data_min_calc = date.today()
             data_max_calc = date.today()
