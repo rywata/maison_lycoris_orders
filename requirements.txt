@@ -1,4 +1,8 @@
 streamlit
-supabase
 pandas
-pytz
+gspread
+oauth2client
+supabase
+postgrest
+toml
+qrcode
