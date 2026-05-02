@@ -6,13 +6,20 @@ from datetime import datetime
 import streamlit as st
 from oauth2client.service_account import ServiceAccountCredentials
 
-# --- CONEXÃO GOOGLE SHEETS ---
+# --- CONFIGURAÇÕES INICIAIS ---
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+
+# Conexão Google via Secrets
 google_info = st.secrets["google_creds"]
 creds = ServiceAccountCredentials.from_json_keyfile_dict(google_info, scope)
 gc = gspread.authorize(creds)
 planilha = gc.open("Controle")
 
+<<<<<<< HEAD
 # --- CONEXÃO SUPABASE ---
+=======
+# Conexão Supabase via Secrets
+>>>>>>> c6fda1d3dbead0b51db78e51e2fa3c21b4e2eb08
 SUPABASE_URL = st.secrets["supabase"]["url"]
 SUPABASE_KEY = st.secrets["supabase"]["service_role_key"]
 sb = create_client(SUPABASE_URL, SUPABASE_KEY)
