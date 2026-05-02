@@ -45,8 +45,10 @@ class Database:
             query = self.sb.table(tabela).update(dados)
             for coluna, valor in filtros.items():
                 query = query.eq(coluna, valor)
-            query.execute()
-            return True
+            response = query.execute()
+            if response.data is not None:
+                return True
+            return False
         except Exception as e:
             st.error(f"Erro ao atualizar {tabela}: {e}")
             return False
@@ -102,11 +104,20 @@ class Database:
         return self.inserir_lote("producao", linhas)
 
     def atualizar_status_producao(self, id_producao, novo_status):
-        return self.atualizar(
-            "producao",
-            filtros={"id_producao": id_producao},
-            dados={"status": novo_status}
-        )
+        try:
+            response = (
+                self.sb.table("producao")
+                .update({"status": novo_status})
+                .eq("id_producao", id_producao)
+                .execute()
+            )
+            if not response.data:
+                st.warning(f"Nenhuma linha atualizada para id_producao: {id_producao}")
+                return False
+            return True
+        except Exception as e:
+            st.error(f"Erro ao atualizar status: {e}")
+            return False
 
     def custo_receita(self, produto, quantidade):
         return self.rpc("calcular_custo_receita", {

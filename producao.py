@@ -238,7 +238,7 @@ def renderizar_producao():
         )
 
 
-def _confirmar_producao(row, df_movimentacoes, df_precos, df_receitas):
+def _confirmar_producao(row, df_movimentacoes, df_receitas):
     try:
         db = Database()
         calc = CalculadorCustos(db.precos())
@@ -256,12 +256,20 @@ def _confirmar_producao(row, df_movimentacoes, df_precos, df_receitas):
             data_entrega=row.get('data_entrega', '')
         )
 
-        db.salvar_movimentacao(linha_mov)
+        # Salva ENT-P no estoque
+        ok_mov = db.salvar_movimentacao(linha_mov)
+        if not ok_mov:
+            st.session_state._producao_erro = "Falha ao salvar movimentação no estoque."
+            return
 
-        db.atualizar_status_producao(row['id_producao'], novo_status)
+        # Atualiza status
+        ok_status = db.atualizar_status_producao(row['id_producao'], novo_status)
+        if not ok_status:
+            st.session_state._producao_erro = f"Falha ao atualizar status. ID: {row['id_producao']}"
+            return
 
         st.session_state._producao_confirmada = True
         st.session_state._producao_msg = f"✅ {row['produto']} marcado como {novo_status}!"
 
     except Exception as e:
-        st.session_state._producao_erro = str(e)
+        st.session_state._producao_erro = f"Exceção: {type(e).__name__}: {e}"
