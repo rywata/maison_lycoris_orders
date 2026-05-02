@@ -5,14 +5,17 @@ from datetime import date
 
 @st.cache_data(ttl=60)
 def carregar_pedidos():
-    df = Database().pedidos()
+    db = Database()
+    df = db.pedidos()
     
     if df is None or df.empty:
         return pd.DataFrame()
-    
+
     df.columns = [c.lower() for c in df.columns]
+    
     df['data_pedido'] = pd.to_datetime(df['data_pedido'], errors='coerce')
     df['data_entrega'] = pd.to_datetime(df['data_entrega'], errors='coerce')
+    
     cols_financeiras = ['total_liquido', 'total_bruto', 'desconto']
     for col in cols_financeiras:
         if col in df.columns:
@@ -22,13 +25,15 @@ def carregar_pedidos():
 
 def renderizar_historico():
     st.title("📂 Histórico de Pedidos")
-
+    
+    # 1. Carrega os dados primeiro
     df_raw = carregar_pedidos()
 
     if df_raw.empty:
         st.warning("Nenhum pedido encontrado no banco de dados.")
         return
 
+    # 2. Prepara o DataFrame de trabalho
     df = df_raw.copy()
     df['data_pedido_limpa'] = df['data_pedido'].dt.date
 
@@ -38,13 +43,15 @@ def renderizar_historico():
         
         busca_nome = st.text_input("Nome do Cliente").strip()
 
+        # Dropdown de produtos
         produtos_disponiveis = ["Todos"] + sorted(df['produto'].dropna().unique().tolist())
         produto_sel = st.selectbox("Produto", produtos_disponiveis)
-        datas_lista = [d for d in df['data_pedido_limpa'].tolist() if isinstance(d, date)]
         
-        if datas_lista:
-            data_min_calc = min(datas_lista)
-            data_max_calc = max(datas_lista)
+        # Tratamento de datas nulas para o slider
+        datas_validas = df['data_pedido'].dropna()
+        if not datas_validas.empty:
+            data_min_calc = datas_validas.min().date()
+            data_max_calc = datas_validas.max().date()
         else:
             data_min_calc = data_max_calc = date.today()
 
@@ -77,9 +84,9 @@ def renderizar_historico():
     total_pedidos = len(pedidos_unicos)
     faturamento = pedidos_unicos.sum()
 
-    col1, col2 = st.columns(2)
-    col1.metric("Pedidos Localizados", total_pedidos)
-    col2.metric("Faturamento Total", f"R$ {faturamento:,.2f}")
+    m1, m2 = st.columns(2)
+    m1.metric("Pedidos Localizados", total_pedidos)
+    m2.metric("Faturamento Total", f"R$ {faturamento:,.2f}")
 
     st.divider()
 
@@ -92,8 +99,9 @@ def renderizar_historico():
         'total_liquido': 'Total Líquido'
     }
 
-    colunas_finais = [c for c in colunas_visiveis.keys() if c in df_filtrado.columns]
-    df_exibir = df_filtrado[colunas_finais].rename(columns=colunas_visiveis)
+    # Garante que as colunas existem antes de renomear
+    colunas_existentes = [c for c in colunas_visiveis.keys() if c in df_filtrado.columns]
+    df_exibir = df_filtrado[colunas_existentes].rename(columns=colunas_visiveis)
 
     st.dataframe(
         df_exibir.sort_values('Data', ascending=False),
@@ -111,4 +119,4 @@ def renderizar_historico():
             .agg(Qtd_Total=('quantidade', 'sum'), Valor_Total=('total_liquido', 'sum'))
             .sort_values('Valor_Total', ascending=False)
         )
-        st.table(resumo_prod) 
+        st.table(resumo_prod)
