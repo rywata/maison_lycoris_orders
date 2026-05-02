@@ -72,13 +72,15 @@ def renderizar_historico():
     if isinstance(intervalo, (list, tuple)) and len(intervalo) == 2:
         inicio, fim = intervalo
         
-        inicio = pd.to_datetime(inicio)
-        fim = pd.to_datetime(fim) + pd.Timedelta(days=1)
+        inicio = pd.to_datetime(inicio).replace(tzinfo=None)
+        fim = pd.to_datetime(fim).replace(tzinfo=None) + pd.Timedelta(days=1)
+
+        data_pedido_sem_tz = pd.to_datetime(df['data_pedido']).dt.tz_localize(None)
 
         mask &= (
-            df['data_pedido'].notna() &
-            (df['data_pedido'] >= inicio) &
-            (df['data_pedido'] < fim)
+            data_pedido_sem_tz.notna() &
+            (data_pedido_sem_tz >= inicio) &
+            (data_pedido_sem_tz < fim)
         )
 
     df_filtrado = df[mask]
