@@ -13,9 +13,11 @@ def carregar_pedidos():
 
     df.columns = [c.lower() for c in df.columns]
     
+    # Conversão segura de datas
     df['data_pedido'] = pd.to_datetime(df['data_pedido'], errors='coerce')
     df['data_entrega'] = pd.to_datetime(df['data_entrega'], errors='coerce')
     
+    # Conversão de valores financeiros
     cols_financeiras = ['total_liquido', 'total_bruto', 'desconto']
     for col in cols_financeiras:
         if col in df.columns:
@@ -23,31 +25,29 @@ def carregar_pedidos():
             
     return df
 
+
 def renderizar_historico():
     st.title("📂 Histórico de Pedidos")
     
-    # 1. Carrega os dados primeiro
     df_raw = carregar_pedidos()
 
     if df_raw.empty:
         st.warning("Nenhum pedido encontrado no banco de dados.")
         return
 
-    # 2. Prepara o DataFrame de trabalho
     df = df_raw.copy()
-    df['data_pedido_limpa'] = df['data_pedido'].dt.date
 
-    # --- FILTROS NA SIDEBAR ---
+    # --- SIDEBAR ---
     with st.sidebar:
         st.header("🔍 Filtros")
         
         busca_nome = st.text_input("Nome do Cliente").strip()
 
-        # Dropdown de produtos
+        # Produtos
         produtos_disponiveis = ["Todos"] + sorted(df['produto'].dropna().unique().tolist())
         produto_sel = st.selectbox("Produto", produtos_disponiveis)
         
-        # Tratamento de datas nulas para o slider
+        # Datas seguras
         datas_validas = df['data_pedido'].dropna()
         if not datas_validas.empty:
             data_min_calc = datas_validas.min().date()
@@ -60,7 +60,7 @@ def renderizar_historico():
             value=(data_min_calc, data_max_calc)
         )
 
-    # --- LÓGICA DE FILTRAGEM ---
+    # --- FILTROS ---
     mask = pd.Series(True, index=df.index)
 
     if busca_nome:
@@ -71,7 +71,15 @@ def renderizar_historico():
 
     if isinstance(intervalo, (list, tuple)) and len(intervalo) == 2:
         inicio, fim = intervalo
-        mask &= (df['data_pedido_limpa'] >= inicio) & (df['data_pedido_limpa'] <= fim)
+        
+        inicio = pd.to_datetime(inicio)
+        fim = pd.to_datetime(fim) + pd.Timedelta(days=1)
+
+        mask &= (
+            df['data_pedido'].notna() &
+            (df['data_pedido'] >= inicio) &
+            (df['data_pedido'] < fim)
+        )
 
     df_filtrado = df[mask]
 
@@ -90,21 +98,29 @@ def renderizar_historico():
 
     st.divider()
 
-    # --- EXIBIÇÃO DA TABELA ---
+    # --- TABELA ---
     colunas_visiveis = {
-        'data_pedido_limpa': 'Data',
+        'data_pedido': 'Data',
         'nome_cliente': 'Cliente',
         'produto': 'Produto',
         'quantidade': 'Qtd',
         'total_liquido': 'Total Líquido'
     }
 
-    # Garante que as colunas existem antes de renomear
     colunas_existentes = [c for c in colunas_visiveis.keys() if c in df_filtrado.columns]
-    df_exibir = df_filtrado[colunas_existentes].rename(columns=colunas_visiveis)
+
+    df_exibir = df_filtrado[colunas_existentes].copy()
+    df_exibir = df_exibir.rename(columns=colunas_visiveis)
+
+    # Converter data só para exibição
+    if 'Data' in df_exibir.columns:
+        df_exibir['Data'] = pd.to_datetime(df_exibir['Data'], errors='coerce').dt.date
+
+    # Ordenação segura
+    df_exibir = df_exibir.sort_values('Data', ascending=False, na_position='last')
 
     st.dataframe(
-        df_exibir.sort_values('Data', ascending=False),
+        df_exibir,
         use_container_width=True,
         hide_index=True,
         column_config={
@@ -112,11 +128,14 @@ def renderizar_historico():
         }
     )
 
-    # --- RESUMOS EXPANSÍVEIS ---
+    # --- RESUMO ---
     with st.expander("📊 Resumo por Produto"):
         resumo_prod = (
             df_filtrado.groupby('produto')
-            .agg(Qtd_Total=('quantidade', 'sum'), Valor_Total=('total_liquido', 'sum'))
+            .agg(
+                Qtd_Total=('quantidade', 'sum'),
+                Valor_Total=('total_liquido', 'sum')
+            )
             .sort_values('Valor_Total', ascending=False)
         )
         st.table(resumo_prod)
