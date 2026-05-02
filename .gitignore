@@ -5,7 +5,7 @@
 
 
 *.json
-!Controle - Receitas Python.csv # Exemplo: se quiser manter CSVs específicos, use a "!"
+!Controle - Receitas Python.csv
 
 # --- PYTHON ---
 __pycache__/

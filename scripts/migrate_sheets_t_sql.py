@@ -13,8 +13,8 @@ gc = gspread.authorize(creds)
 planilha = gc.open("Controle")
 
 # --- CONEXÃO SUPABASE ---
-SUPABASE_URL = "https://utvpztdvgmaywqeujlit.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0dnB6dGR2Z21heXdxZXVqbGl0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzQ2MjA4MSwiZXhwIjoyMDkzMDM4MDgxfQ.7MywCVtoZUpTURnAPcvQ84bDhJdwPTJjqgMB_3SfJvg"
+SUPABASE_URL = st.secrets["supabase"]["url"]
+SUPABASE_KEY = st.secrets["supabase"]["service_role_key"]
 sb = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def limpar_numerico(valor):
