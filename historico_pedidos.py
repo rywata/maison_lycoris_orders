@@ -5,72 +5,75 @@ from datetime import date
 
 @st.cache_data(ttl=60)
 def carregar_pedidos():
-    return Database().pedidos()
+    df = Database().pedidos()
+    
+    if df is None or df.empty:
+        return pd.DataFrame()
+    
+    df.columns = [c.lower() for c in df.columns]
+    df['data_pedido'] = pd.to_datetime(df['data_pedido'], errors='coerce')
+    df['data_entrega'] = pd.to_datetime(df['data_entrega'], errors='coerce')
+    cols_financeiras = ['total_liquido', 'total_bruto', 'desconto']
+    for col in cols_financeiras:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            
+    return df
 
 def renderizar_historico():
     st.title("📂 Histórico de Pedidos")
 
-    df = carregar_pedidos()
+    df_raw = carregar_pedidos()
 
-    if df.empty:
-        st.warning("Nenhum pedido encontrado.")
+    if df_raw.empty:
+        st.warning("Nenhum pedido encontrado no banco de dados.")
         return
 
-    df.columns = [c.lower() for c in df.columns]
-    
-    df['data_pedido'] = pd.to_datetime(df['data_pedido'], errors='coerce').dt.date
-    df['data_entrega'] = pd.to_datetime(df['data_entrega'], errors='coerce').dt.date
-    
-    df['total_liquido'] = pd.to_numeric(df['total_liquido'], errors='coerce').fillna(0)
+    df = df_raw.copy()
+    df['data_pedido_limpa'] = df['data_pedido'].dt.date
 
     # --- FILTROS NA SIDEBAR ---
     with st.sidebar:
         st.header("🔍 Filtros")
+        
         busca_nome = st.text_input("Nome do Cliente").strip()
 
         produtos_disponiveis = ["Todos"] + sorted(df['produto'].dropna().unique().tolist())
         produto_sel = st.selectbox("Produto", produtos_disponiveis)
-
-        datas_validas = df['data_pedido'].dropna()
+        datas_lista = [d for d in df['data_pedido_limpa'].tolist() if isinstance(d, date)]
         
-        if not datas_validas.empty:
-            lista_datas = list(datas_validas)
-            data_min_calc = min(lista_datas)
-            data_max_calc = max(lista_datas)
+        if datas_lista:
+            data_min_calc = min(datas_lista)
+            data_max_calc = max(datas_lista)
         else:
-            data_min_calc = date.today()
-            data_max_calc = date.today()
+            data_min_calc = data_max_calc = date.today()
 
         intervalo = st.date_input(
             "Intervalo de Datas", 
             value=(data_min_calc, data_max_calc)
         )
 
-    # --- FILTRAGEM ---
-    df_filtrado = df.copy()
+    # --- LÓGICA DE FILTRAGEM ---
+    mask = pd.Series(True, index=df.index)
 
     if busca_nome:
-        df_filtrado = df_filtrado[
-            df_filtrado['nome_cliente'].str.contains(busca_nome, case=False, na=False)
-        ]
+        mask &= df['nome_cliente'].str.contains(busca_nome, case=False, na=False)
 
     if produto_sel != "Todos":
-        df_filtrado = df_filtrado[df_filtrado['produto'] == produto_sel]
+        mask &= (df['produto'] == produto_sel)
 
     if isinstance(intervalo, (list, tuple)) and len(intervalo) == 2:
         inicio, fim = intervalo
-        df_filtrado = df_filtrado.dropna(subset=['data_pedido'])
-        df_filtrado = df_filtrado[
-            (df_filtrado['data_pedido'] >= inicio) &
-            (df_filtrado['data_pedido'] <= fim)
-        ]
+        mask &= (df['data_pedido_limpa'] >= inicio) & (df['data_pedido_limpa'] <= fim)
+
+    df_filtrado = df[mask]
 
     if df_filtrado.empty:
         st.info("Nenhum pedido atende aos filtros selecionados.")
         return
 
     # --- MÉTRICAS ---
-    pedidos_unicos = df_filtrado.groupby('id_pedido')['total_liquido'].sum()
+    pedidos_unicos = df_filtrado.groupby('id_pedido')['total_liquido'].first()
     total_pedidos = len(pedidos_unicos)
     faturamento = pedidos_unicos.sum()
 
@@ -80,74 +83,32 @@ def renderizar_historico():
 
     st.divider()
 
-    # --- TABELA ---
+    # --- EXIBIÇÃO DA TABELA ---
     colunas_visiveis = {
-        'data_pedido': 'Data Pedido',
+        'data_pedido_limpa': 'Data',
         'nome_cliente': 'Cliente',
         'produto': 'Produto',
         'quantidade': 'Qtd',
-        'total_bruto': 'Bruto',
-        'desconto': 'Desconto',
-        'total_liquido': 'Total Líquido',
-        'data_entrega': 'Data Entrega',
+        'total_liquido': 'Total Líquido'
     }
 
-    # Garante que apenas colunas existentes sejam usadas
-    colunas_reais = [c for c in colunas_visiveis.keys() if c in df_filtrado.columns]
-    df_exibir = df_filtrado[colunas_reais].rename(columns=colunas_visiveis)
+    colunas_finais = [c for c in colunas_visiveis.keys() if c in df_filtrado.columns]
+    df_exibir = df_filtrado[colunas_finais].rename(columns=colunas_visiveis)
 
     st.dataframe(
-        df_exibir.sort_values('Data Pedido', ascending=False),
+        df_exibir.sort_values('Data', ascending=False),
         use_container_width=True,
         hide_index=True,
         column_config={
-            "Bruto": st.column_config.NumberColumn(format="R$ %.2f"),
-            "Desconto": st.column_config.NumberColumn(format="R$ %.2f"),
             "Total Líquido": st.column_config.NumberColumn(format="R$ %.2f"),
         }
     )
 
-    st.divider()
-
-    # --- RESUMO POR PRODUTO ---
-    with st.expander("📊 Resumo por produto"):
-        resumo = (
+    # --- RESUMOS EXPANSÍVEIS ---
+    with st.expander("📊 Resumo por Produto"):
+        resumo_prod = (
             df_filtrado.groupby('produto')
-            .agg(
-                Pedidos=('id_pedido', 'nunique'),
-                Quantidade=('quantidade', 'sum'),
-                Faturamento=('total_liquido', 'sum')
-            )
-            .reset_index()
-            .rename(columns={'produto': 'Produto'})
-            .sort_values('Faturamento', ascending=False)
+            .agg(Qtd_Total=('quantidade', 'sum'), Valor_Total=('total_liquido', 'sum'))
+            .sort_values('Valor_Total', ascending=False)
         )
-        st.dataframe(
-            resumo,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Faturamento": st.column_config.NumberColumn(format="R$ %.2f"),
-            }
-        )
-
-    # --- RESUMO POR CLIENTE ---
-    with st.expander("👥 Resumo por cliente"):
-        por_cliente = (
-            df_filtrado.groupby('nome_cliente')
-            .agg(
-                Pedidos=('id_pedido', 'nunique'),
-                Faturamento=('total_liquido', 'sum')
-            )
-            .reset_index()
-            .rename(columns={'nome_cliente': 'Cliente'})
-            .sort_values('Faturamento', ascending=False)
-        )
-        st.dataframe(
-            por_cliente,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Faturamento": st.column_config.NumberColumn(format="R$ %.2f"),
-            }
-        )
+        st.table(resumo_prod) 
