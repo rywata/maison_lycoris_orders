@@ -16,10 +16,8 @@ def renderizar_historico():
         st.warning("Nenhum pedido encontrado.")
         return
 
-    # Normaliza colunas (SQL retorna minúsculo)
     df.columns = [c.lower() for c in df.columns]
     
-    # Conversão segura para data e números
     df['data_pedido'] = pd.to_datetime(df['data_pedido'], errors='coerce').dt.date
     df['data_entrega'] = pd.to_datetime(df['data_entrega'], errors='coerce').dt.date
     df['total_liquido'] = pd.to_numeric(df['total_liquido'], errors='coerce').fillna(0)
@@ -93,6 +91,7 @@ def renderizar_historico():
         'data_entrega': 'Data Entrega',
     }
 
+    # Garante que apenas colunas existentes sejam usadas
     colunas_reais = [c for c in colunas_visiveis.keys() if c in df_filtrado.columns]
     df_exibir = df_filtrado[colunas_reais].rename(columns=colunas_visiveis)
 
