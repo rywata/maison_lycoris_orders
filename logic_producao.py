@@ -19,7 +19,14 @@ class GerenciadorProducao:
         self.gerenciador_mov = GerenciadorMovimentacao(df_movimentacoes)
 
         if not self.receitas.empty:
-            self.receitas.columns = self.receitas.columns.str.strip()
+            # Normaliza colunas do Supabase (minúsculo) para o padrão esperado
+            self.receitas.columns = self.receitas.columns.str.strip().str.lower()
+            self.receitas = self.receitas.rename(columns={
+                'produto': 'Produto',
+                'item_insumo': 'Item (Insumo)',
+                'qtd_receita': 'Qtd_Receita',
+                'unidade': 'Unidade'
+            })
             self.receitas['Qtd_Receita'] = pd.to_numeric(
                 self.receitas['Qtd_Receita'], errors='coerce'
             ).fillna(0)
