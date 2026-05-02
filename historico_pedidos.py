@@ -18,6 +18,8 @@ def renderizar_historico():
 
     # Normaliza colunas (SQL retorna minúsculo)
     df.columns = [c.lower() for c in df.columns]
+    
+    # Conversão segura para data e números
     df['data_pedido'] = pd.to_datetime(df['data_pedido'], errors='coerce').dt.date
     df['data_entrega'] = pd.to_datetime(df['data_entrega'], errors='coerce').dt.date
     df['total_liquido'] = pd.to_numeric(df['total_liquido'], errors='coerce').fillna(0)
@@ -31,9 +33,19 @@ def renderizar_historico():
         produtos_disponiveis = ["Todos"] + sorted(df['produto'].dropna().unique().tolist())
         produto_sel = st.selectbox("Produto", produtos_disponiveis)
 
-        data_min = df['data_pedido'].min() or date.today()
-        data_max = df['data_pedido'].max() or date.today()
-        intervalo = st.date_input("Intervalo de Datas", value=(data_min, data_max))
+        datas_validas = df['data_pedido'].dropna()
+        
+        if not datas_validas.empty:
+            data_min_calc = datas_validas.min()
+            data_max_calc = datas_validas.max()
+        else:
+            data_min_calc = date.today()
+            data_max_calc = date.today()
+
+        intervalo = st.date_input(
+            "Intervalo de Datas", 
+            value=(data_min_calc, data_max_calc)
+        )
 
     # --- FILTRAGEM ---
     df_filtrado = df.copy()
@@ -48,13 +60,17 @@ def renderizar_historico():
 
     if isinstance(intervalo, (list, tuple)) and len(intervalo) == 2:
         inicio, fim = intervalo
+        df_filtrado = df_filtrado.dropna(subset=['data_pedido'])
         df_filtrado = df_filtrado[
             (df_filtrado['data_pedido'] >= inicio) &
             (df_filtrado['data_pedido'] <= fim)
         ]
 
+    if df_filtrado.empty:
+        st.info("Nenhum pedido atende aos filtros selecionados.")
+        return
+
     # --- MÉTRICAS ---
-    # Agrupa por pedido para não contar linhas duplicadas
     pedidos_unicos = df_filtrado.groupby('id_pedido')['total_liquido'].sum()
     total_pedidos = len(pedidos_unicos)
     faturamento = pedidos_unicos.sum()
@@ -77,7 +93,8 @@ def renderizar_historico():
         'data_entrega': 'Data Entrega',
     }
 
-    df_exibir = df_filtrado[list(colunas_visiveis.keys())].rename(columns=colunas_visiveis)
+    colunas_reais = [c for c in colunas_visiveis.keys() if c in df_filtrado.columns]
+    df_exibir = df_filtrado[colunas_reais].rename(columns=colunas_visiveis)
 
     st.dataframe(
         df_exibir.sort_values('Data Pedido', ascending=False),

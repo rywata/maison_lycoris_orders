@@ -241,7 +241,7 @@ def renderizar_producao():
 def _confirmar_producao(row, df_movimentacoes, df_precos, df_receitas):
     try:
         db = Database()
-        calc = CalculadorCustos(db.precos())  # sempre fresco
+        calc = CalculadorCustos(db.precos())  
 
         gestor = GerenciadorStatusProducao(
             pd.DataFrame(),
