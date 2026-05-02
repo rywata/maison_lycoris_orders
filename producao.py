@@ -96,7 +96,7 @@ def renderizar_producao():
                             use_container_width=True,
                             type="primary",
                             on_click=_confirmar_producao,
-                            args=(row, df_movimentacoes, df_precos, df_receitas)
+                            args=(row, df_movimentacoes, df_receitas)
                         )
 
             st.divider()
