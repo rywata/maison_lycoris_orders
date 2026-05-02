@@ -140,24 +140,26 @@ class GerenciadorStatusProducao:
 
 class CalculadorCustos:
     def __init__(self, df_precos):
-        self.precos = pd.DataFrame(df_precos)
+        self.precos = pd.DataFrame(df_precos).copy()
 
         if not self.precos.empty:
             self.precos.columns = self.precos.columns.str.strip()
 
-            self.precos['Preço'] = pd.to_numeric(
-                self.precos['Preço'], errors='coerce'
-            ).fillna(0)
+            if 'Preço' not in self.precos.columns and 'preco' in self.precos.columns:
+                self.precos = self.precos.rename(columns={'preco': 'Preço'})
+            
+            if 'Unidade' not in self.precos.columns and 'unidade' in self.precos.columns:
+                self.precos = self.precos.rename(columns={'unidade': 'Unidade'})
 
-            self.precos['Unidade'] = pd.to_numeric(
-                self.precos['Unidade'], errors='coerce'
-            ).fillna(1)
-
-            self.precos['Unidade'] = self.precos['Unidade'].replace(0, 1)
-
-            self.precos['Custo Unitário'] = (
-                self.precos['Preço'] / self.precos['Unidade']
-            )
+            self.precos['Preço'] = pd.to_numeric(self.precos['Preço'], errors='coerce').fillna(0)
+            
+            unidade_col = 'Unidade' if 'Unidade' in self.precos.columns else None
+            if unidade_col:
+                self.precos[unidade_col] = pd.to_numeric(self.precos[unidade_col], errors='coerce').fillna(1)
+                self.precos[unidade_col] = self.precos[unidade_col].replace(0, 1)
+                self.precos['Custo Unitário'] = self.precos['Preço'] / self.precos[unidade_col]
+            else:
+                self.precos['Custo Unitário'] = self.precos['Preço']
 
             self._idx = self.precos.set_index('Item')
 
