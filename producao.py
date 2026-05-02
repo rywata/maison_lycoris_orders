@@ -1,73 +1,38 @@
 import streamlit as st
 import pandas as pd
 from database import Database
-from logic_producao import GerenciadorProducao, AnalisadorProducao
+from logic_producao import GerenciadorProducao, GerenciadorStatusProducao, AnalisadorProducao, CalculadorCustos
+from datetime import datetime
+import pytz
 
+fuso_brasil = pytz.timezone('America/Sao_Paulo')
 
 @st.cache_data(ttl=60)
 def carregar_dados_producao():
-    try:
-        db = Database()
-        aba = db.conectar_aba("Controle", "Produção")
-        dados = aba.get_all_records()
-        df = pd.DataFrame(dados)
-        if not df.empty:
-            df.columns = df.columns.str.strip()
-        return df
-    except Exception as e:
-        st.error(f"Erro ao acessar aba de Produção: {e}")
-        return pd.DataFrame()
-
+    return Database().producao()
 
 @st.cache_data(ttl=300)
 def carregar_receitas():
-    try:
-        db = Database()
-        aba = db.conectar_aba("Controle", "Receitas Python")
-        dados = aba.get_all_records()
-        df = pd.DataFrame(dados)
-        if not df.empty:
-            df.columns = df.columns.str.strip()
-        return df
-    except Exception as e:
-        st.error(f"Erro ao acessar aba de Receitas: {e}")
-        return pd.DataFrame()
-
+    return Database().receitas()
 
 @st.cache_data(ttl=60)
 def carregar_movimentacoes():
-    try:
-        db = Database()
-        aba = db.conectar_aba("Controle", "Movimentações")
-        dados = aba.get_all_records()
-        df = pd.DataFrame(dados)
-        if not df.empty:
-            df.columns = df.columns.str.strip()
-        return df
-    except Exception as e:
-        st.error(f"Erro ao acessar aba de Movimentações: {e}")
-        return pd.DataFrame()
+    return Database().movimentacoes()
 
 @st.cache_data(ttl=300)
 def carregar_precos():
-    try:
-        db = Database()
-        aba = db.conectar_aba("Controle", "Preço Insumos")
-        dados = aba.get_all_records(value_render_option='UNFORMATTED_VALUE')
-        df = pd.DataFrame(dados)
-        if not df.empty:
-            df.columns = df.columns.str.strip()
-        return df
-    except Exception as e:
-        st.error(f"Erro ao acessar Preço Insumos: {e}")
-        return pd.DataFrame()
+    return Database().precos()
+
 
 def renderizar_producao():
+    st.title("🏗️ Gestão de Produção")
+
     if 'mostrar_form_producao' not in st.session_state:
         st.session_state.mostrar_form_producao = False
     if 'mostrar_busca_producao' not in st.session_state:
         st.session_state.mostrar_busca_producao = False
 
+    # Trata resultado do callback fora do on_click
     if st.session_state.get('_producao_confirmada'):
         st.success(st.session_state.pop('_producao_msg', ''))
         st.session_state._producao_confirmada = False
@@ -81,15 +46,16 @@ def renderizar_producao():
     df_movimentacoes = carregar_movimentacoes()
     df_precos = carregar_precos()
 
-
-    # --- DASHBOARD DE ORDENS PENDENTES ---
+    # --- DASHBOARD ---
     st.subheader("📋 Ordens de Produção")
 
     if not df_producao.empty:
-        pendentes = df_producao[df_producao['Status'] == 'Pendente'].copy()
-        concluidos = df_producao[df_producao['Status'].isin(['Concluído', 'Entregue'])].copy()
+        # Normaliza nome da coluna status (SQL retorna minúsculo)
+        df_producao.columns = [c.lower() for c in df_producao.columns]
 
-        # Métricas rápidas
+        pendentes = df_producao[df_producao['status'] == 'Pendente'].copy()
+        concluidos = df_producao[df_producao['status'].isin(['Concluído', 'Entregue'])].copy()
+
         m1, m2, m3 = st.columns(3)
         m1.metric("Pendentes", len(pendentes))
         m2.metric("Concluídos", len(concluidos))
@@ -101,50 +67,45 @@ def renderizar_producao():
         if not pendentes.empty:
             st.markdown("### ⏳ Aguardando produção")
 
-            for _, row in pendentes.iterrows():
+            # Usa a view do SQL que já traz custo estimado
+            db = Database()
+            df_pendentes_sql = db.ordens_pendentes()
+
+            for _, row in df_pendentes_sql.iterrows():
                 with st.container(border=True):
                     c1, c2, c3, c4 = st.columns([4, 2, 2, 2])
 
                     with c1:
-                        st.markdown(f"**{row['Produto']}**")
-                        st.caption(f"Pedido `{row['ID Pedido']}`")
-                        if not df_receitas.empty and not df_precos.empty:
-                            from logic_producao import CalculadorCustos, GerenciadorProducao
-                            produtor = GerenciadorProducao(df_receitas, df_movimentacoes)
-                            calc = CalculadorCustos(df_precos)
-                            insumos = produtor.calcular_insumos(
-                                row['Produto'], int(float(row['Quantidade']))
-                            )
-                            if insumos:
-                                _, total = calc.calcular_custo_receita(insumos)
-                                st.caption(f"Custo estimado: R$ {total:.2f}")
+                        st.markdown(f"**{row['produto']}**")
+                        st.caption(f"Pedido `{row['id_pedido']}`")
+                        custo = row.get('custo_estimado', 0) or 0
+                        st.caption(f"Custo estimado: R$ {custo:.2f}")
 
                     with c2:
                         st.markdown("**Qtd**")
-                        st.markdown(f"{int(float(row['Quantidade']))} un")
+                        st.markdown(f"{int(float(row['quantidade']))} un")
 
                     with c3:
                         st.markdown("**Entrega**")
-                        data_fmt = row.get('Data Entrega', '—')
-                        st.markdown(f"{data_fmt}")
+                        st.markdown(f"{row.get('data_entrega', '—')}")
 
                     with c4:
                         st.button(
                             "✅ Concluir",
-                            key=f"concluir_{row['ID Produção']}",
+                            key=f"concluir_{row['id_producao']}",
                             use_container_width=True,
                             type="primary",
                             on_click=_confirmar_producao,
-                            args=(row, df_movimentacoes, df_precos, df_receitas)  # <- passa df_precos
+                            args=(row, df_movimentacoes, df_precos, df_receitas)
                         )
 
             st.divider()
 
-        # --- CLUÍDOS RECENTES ---
+        # --- HISTÓRICO ---
         if not concluidos.empty:
             with st.expander(f"✅ Histórico de produções concluídas ({len(concluidos)})"):
                 st.dataframe(
-                    concluidos.sort_values('Data Produção', ascending=False),
+                    concluidos.sort_values('data_producao', ascending=False),
                     use_container_width=True,
                     hide_index=True
                 )
@@ -168,7 +129,7 @@ def renderizar_producao():
     # --- FORMULÁRIO DE PRODUÇÃO MANUAL ---
     if st.session_state.mostrar_form_producao and not df_receitas.empty:
         st.divider()
-        produtos_disponiveis = sorted(df_receitas['Produto'].dropna().unique().tolist())
+        produtos_disponiveis = sorted(df_receitas['produto'].dropna().unique().tolist())
 
         with st.form("form_producao"):
             st.markdown("### 🍞 Registrar produção manual")
@@ -182,18 +143,18 @@ def renderizar_producao():
                 data_entrega = st.date_input("Data de entrega")
                 id_ref = st.text_input("Referência (opcional)", placeholder="Ex: Fornada extra")
 
+            # Preview de custo via SQL
             if produto:
-                produtor = GerenciadorProducao(df_receitas, df_movimentacoes)
-                calc = CalculadorCustos(df_precos)
-                insumos = produtor.calcular_insumos(produto, quantidade)
-                if insumos:
-                    df_custos, total = calc.calcular_custo_receita(insumos)
+                db = Database()
+                df_custo = db.custo_receita(produto, quantidade)
+                if not df_custo.empty:
                     st.markdown("**Insumos e custos estimados:**")
                     st.dataframe(
-                        df_custos[['Item', 'Quantidade', 'Unidade', 'Custo Total (R$)']],
+                        df_custo[['item_insumo', 'qtd_total', 'unidade', 'custo_total']],
                         use_container_width=True,
                         hide_index=True
                     )
+                    total = db.custo_total_receita(produto, quantidade)
                     st.metric("Custo total estimado", f"R$ {total:.2f}")
 
             btn1, btn2 = st.columns(2)
@@ -201,16 +162,7 @@ def renderizar_producao():
                 if st.form_submit_button("✅ Confirmar produção", use_container_width=True):
                     try:
                         db = Database()
-                        aba_mov = db.conectar_aba("Controle", "Movimentações")
-                        aba_prod = db.conectar_aba("Controle", "Produção")
-                        aba_precos_raw = db.conectar_aba("Controle", "Preço Insumos")
-
-                        df_precos_raw = pd.DataFrame(
-                            aba_precos_raw.get_all_records(value_render_option='UNFORMATTED_VALUE')
-                        )
-                        from logic_producao import CalculadorCustos
-                        calc = CalculadorCustos(df_precos_raw)
-
+                        calc = CalculadorCustos(df_precos)
                         produtor = GerenciadorProducao(df_receitas, df_movimentacoes)
                         id_ref_final = id_ref if id_ref else "Avulso"
 
@@ -220,12 +172,40 @@ def renderizar_producao():
                         if erro:
                             st.error(erro)
                         else:
+                            # Salva movimentações
+                            movs_dict = []
+                            for linha in linhas_mov:
+                                movs_dict.append({
+                                    "id_mov": linha[0],
+                                    "data_mov": linha[1],
+                                    "tipo": linha[2],
+                                    "item": linha[3],
+                                    "quantidade": linha[4],
+                                    "unidade_medida": linha[5],
+                                    "unidade_compra": linha[6],
+                                    "validade": linha[7] if linha[7] else None,
+                                    "lote": linha[8],
+                                    "custo_unitario": linha[9],
+                                    "custo_total": linha[10],
+                                })
+
+                            # Gera ordem já como Concluído
                             ordem = produtor.gerar_ordem_producao(
                                 id_ref_final, produto, quantidade, data_entrega.isoformat()
                             )
-                            ordem[-1] = "Concluído"
-                            aba_prod.append_row(ordem)
-                            aba_mov.append_rows(linhas_mov, value_input_option='USER_ENTERED')
+                            ordem_dict = {
+                                "id_producao": ordem[0],
+                                "id_pedido": ordem[1],
+                                "data_producao": ordem[2],
+                                "produto": ordem[3],
+                                "quantidade": ordem[4],
+                                "data_entrega": ordem[5],
+                                "status": "Concluído",
+                            }
+
+                            db.salvar_movimentacoes_lote(movs_dict)
+                            db.salvar_ordem_producao(ordem_dict)
+
                             st.success(f"Produção de {quantidade}x {produto} registrada!")
                             st.session_state.mostrar_form_producao = False
                             st.cache_data.clear()
@@ -241,7 +221,6 @@ def renderizar_producao():
     # --- BUSCA ---
     if st.session_state.mostrar_busca_producao and not df_producao.empty:
         st.divider()
-        analisador = AnalisadorProducao(df_producao)
 
         c1, c2 = st.columns(2)
         with c1:
@@ -249,27 +228,20 @@ def renderizar_producao():
         with c2:
             data_fim = st.date_input("Até", key="prod_data_fim")
 
+        analisador = AnalisadorProducao(df_producao)
         df_filtrado = analisador.filtrar_por_periodo(data_ini, data_fim)
         st.metric("Produções encontradas", len(df_filtrado))
         st.dataframe(
-            df_filtrado.sort_values('Data Produção', ascending=False),
-            use_container_width=True, hide_index=True
+            df_filtrado.sort_values('data_producao', ascending=False),
+            use_container_width=True,
+            hide_index=True
         )
 
 
 def _confirmar_producao(row, df_movimentacoes, df_precos, df_receitas):
     try:
-        from logic_producao import GerenciadorStatusProducao, CalculadorCustos
-
         db = Database()
-        aba_mov = db.conectar_aba("Controle", "Movimentações")
-        aba_prod = db.conectar_aba("Controle", "Produção")
-
-        aba_precos = db.conectar_aba("Controle", "Preço Insumos")
-        df_precos_fresh = pd.DataFrame(
-            aba_precos.get_all_records(value_render_option='UNFORMATTED_VALUE')
-        )
-        calc = CalculadorCustos(df_precos_fresh)
+        calc = CalculadorCustos(db.precos())  # sempre fresco
 
         gestor = GerenciadorStatusProducao(
             pd.DataFrame(),
@@ -278,26 +250,32 @@ def _confirmar_producao(row, df_movimentacoes, df_precos, df_receitas):
             df_receitas=df_receitas
         )
         linha_mov, novo_status = gestor.confirmar_producao(
-            id_producao=row['ID Produção'],
-            nome_produto=row['Produto'],
-            quantidade=int(float(row['Quantidade'])),
-            data_entrega=row.get('Data Entrega', '')
+            id_producao=row['id_producao'],
+            nome_produto=row['produto'],
+            quantidade=int(float(row['quantidade'])),
+            data_entrega=row.get('data_entrega', '')
         )
 
-        aba_mov.append_row(linha_mov)
+        # Salva ENT-P no estoque
+        db.salvar_movimentacao({
+            "id_mov": linha_mov[0],
+            "data_mov": linha_mov[1],
+            "tipo": linha_mov[2],
+            "item": linha_mov[3],
+            "quantidade": linha_mov[4],
+            "unidade_medida": linha_mov[5],
+            "unidade_compra": linha_mov[6],
+            "validade": linha_mov[7] if linha_mov[7] else None,
+            "lote": linha_mov[8],
+            "custo_unitario": linha_mov[9],
+            "custo_total": linha_mov[10],
+        })
 
-        todos = aba_prod.get_all_values()
-        headers = todos[0]
-        col_id = headers.index('ID Produção') + 1
-        col_status = headers.index('Status') + 1
-
-        for i, linha in enumerate(todos[1:], start=2):
-            if linha[col_id - 1] == row['ID Produção']:
-                aba_prod.update_cell(i, col_status, novo_status)
-                break
+        # Atualiza status direto no Supabase — sem buscar linha por linha
+        db.atualizar_status_producao(row['id_producao'], novo_status)
 
         st.session_state._producao_confirmada = True
-        st.session_state._producao_msg = f"✅ {row['Produto']} marcado como {novo_status}!"
+        st.session_state._producao_msg = f"✅ {row['produto']} marcado como {novo_status}!"
 
     except Exception as e:
         st.session_state._producao_erro = str(e)

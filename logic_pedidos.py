@@ -48,7 +48,7 @@ class Carrinho:
     def total_final(self) -> float:
         return self.total_bruto - self.desconto_total
 
-class BuscaPedidos:
+'''class BuscaPedidos:
     def __init__(self, df: pd.DataFrame):
         self.df: pd.DataFrame = df
 
@@ -80,4 +80,4 @@ class MetricaPedidos:
         
     @property
     def contagem_pedidos(self) -> int:
-        return int(len(self.df))
+        return int(len(self.df))'''

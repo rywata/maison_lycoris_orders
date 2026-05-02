@@ -4,7 +4,7 @@ import pytz
 
 fuso_brasil = pytz.timezone('America/Sao_Paulo')
 
-class GerenciadorMovimentacao:
+'''class GerenciadorMovimentacao:
     def __init__(self, df_movimentacoes_atual):
         self.df = df_movimentacoes_atual
 
@@ -92,6 +92,7 @@ class AnalisadorEstoque:
         limite = hoje + timedelta(days=dias_margem)
         vencendo = self.df[(self.df['Quantidade'] > 0) & (self.df['Validade'] <= limite) & (self.df['Validade'] >= hoje)]
         return vencendo[['Item', 'Quantidade', 'Validade']]
+'''
 
 class GestorRegras:
     def __init__(self, dados_cadastro):

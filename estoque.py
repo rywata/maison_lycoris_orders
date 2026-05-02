@@ -1,55 +1,47 @@
 import streamlit as st
 import pandas as pd
 from database import Database
-from logic_estoque import AnalisadorEstoque, GerenciadorMovimentacao, BuscaEstoque
+from logic_estoque import GestorRegras
 from datetime import datetime
+import pytz
+
+fuso_brasil = pytz.timezone('America/Sao_Paulo')
+
+@st.cache_data(ttl=60)
+def carregar_movimentacoes():
+    return Database().movimentacoes()
 
 @st.cache_data(ttl=300)
 def carregar_cadastro_insumos():
-    try:
-        db = Database()
-        aba = db.conectar_aba("Controle", "Cadastro de Insumos")
-        dados = aba.get_all_records()
-        df = pd.DataFrame(dados)
-        if not df.empty:
-            df.columns = df.columns.str.strip()
-        return df
-    except Exception as e:
-        st.error(f"Erro ao acessar Cadastro de Insumos: {e}")
-        return pd.DataFrame()
-
-def carregar_dados_estoque():
-    try:
-        db = Database()
-        aba = db.conectar_aba("Controle", "Movimentações")
-        dados = aba.get_all_records()
-        df = pd.DataFrame(dados)
-        if not df.empty:
-            df.columns = df.columns.str.strip()
-        return df
-    except Exception as e:
-        st.error(f"Erro ao acessar aba de Movimentações: {e}")
-        return pd.DataFrame()
+    return Database().insumos()
 
 def renderizar_estoque():
     st.title("📦 Gestão de Estoque")
 
-    df_movimentacoes = carregar_dados_estoque()
+    df_movimentacoes = carregar_movimentacoes()
     df_cadastro = carregar_cadastro_insumos()
 
-    # Garante estado inicial fechado
     if 'mostrar_form' not in st.session_state:
         st.session_state.mostrar_form = False
     if 'mostrar_busca' not in st.session_state:
         st.session_state.mostrar_busca = False
 
     # --- SALDOS ATUAIS ---
-    if df_movimentacoes.empty:
+    db = Database()
+    df_saldo = db.saldo_estoque()
+
+    if df_saldo.empty:
         st.info("Nenhuma movimentação de estoque registrada.")
     else:
-        analisador = AnalisadorEstoque(df_movimentacoes)
         st.subheader("Saldos Atuais")
-        st.dataframe(analisador.saldo_atual, use_container_width=True)
+        st.dataframe(df_saldo, use_container_width=True, hide_index=True)
+
+    # Estoque crítico
+    df_critico = db.estoque_critico()
+    if not df_critico.empty:
+        st.warning(f"⚠️ {len(df_critico)} item(ns) abaixo do estoque mínimo")
+        with st.expander("Ver itens críticos"):
+            st.dataframe(df_critico, use_container_width=True, hide_index=True)
 
     st.divider()
 
@@ -88,47 +80,65 @@ def renderizar_estoque():
         st.session_state.mostrar_busca = not st.session_state.mostrar_busca
         st.session_state.mostrar_form = False
 
-    # --- PAINEL DE BUSCA (só aparece após clicar no botão) ---
-    if st.session_state.mostrar_busca and not df_movimentacoes.empty:
+    # --- PAINEL DE BUSCA ---
+    if st.session_state.mostrar_busca:
         st.divider()
         col1, col2, col3 = st.columns(3)
         with col1:
             filtro_item = st.text_input("Filtrar por item", placeholder="Ex: Farinha")
         with col2:
-            tipos = ["Todos"] + sorted(df_movimentacoes['Tipo'].dropna().unique().tolist())
-            filtro_tipo = st.selectbox("Tipo de movimentação", tipos)
+            tipos_disponiveis = ["Todos"]
+            if not df_movimentacoes.empty and 'tipo' in df_movimentacoes.columns:
+                tipos_disponiveis += sorted(df_movimentacoes['tipo'].dropna().unique().tolist())
+            filtro_tipo = st.selectbox("Tipo de movimentação", tipos_disponiveis)
         with col3:
             filtro_data = st.date_input("Data início", value=None)
 
-        buscador = BuscaEstoque(AnalisadorEstoque(df_movimentacoes).df)
-        buscador.filtrar(
-            item=filtro_item,
-            tipo=filtro_tipo,
-            data_inicio=filtro_data if filtro_data else None,
-        )
+        # Filtros direto no Supabase
+        query_filtros = {}
+        if filtro_tipo != "Todos":
+            query_filtros["tipo"] = filtro_tipo
 
-        st.metric("Registros encontrados", len(buscador.df_filtrado))
+        df_filtrado = db.movimentacoes(filtros=query_filtros if query_filtros else None)
 
-        resumo = buscador.resumo_por_item
-        if not resumo.empty:
-            if buscador.item_unico:
-                row = resumo.iloc[0]
-                un = row['Unidade de Medida']
+        # Filtros que o Supabase não faz facilmente
+        if filtro_item and not df_filtrado.empty:
+            df_filtrado = df_filtrado[
+                df_filtrado['item'].str.contains(filtro_item, case=False, na=False)
+            ]
+        if filtro_data and not df_filtrado.empty:
+            df_filtrado = df_filtrado[
+                pd.to_datetime(df_filtrado['data_mov']) >= pd.Timestamp(filtro_data)
+            ]
+
+        st.metric("Registros encontrados", len(df_filtrado))
+
+        if not df_filtrado.empty:
+            itens_unicos = df_filtrado['item'].dropna().unique()
+            if len(itens_unicos) == 1:
+                un = df_filtrado['unidade_medida'].iloc[0]
+                ent = df_filtrado[df_filtrado['quantidade'] > 0]['quantidade'].sum()
+                sai = df_filtrado[df_filtrado['quantidade'] < 0]['quantidade'].sum()
                 m1, m2, m3 = st.columns(3)
-                m1.metric("Entradas", f"{row['Entradas']:.3f} {un}")
-                m2.metric("Saídas", f"{row['Saídas']:.3f} {un}")
-                m3.metric("Saldo no período", f"{row['Saldo período']:.3f} {un}")
+                m1.metric("Entradas", f"{ent:.3f} {un}")
+                m2.metric("Saídas", f"{abs(sai):.3f} {un}")
+                m3.metric("Saldo no período", f"{ent + sai:.3f} {un}")
             else:
                 st.caption("Totais por item — unidades diferentes não podem ser somadas.")
+                resumo = (
+                    df_filtrado.groupby(['item', 'unidade_medida'])['quantidade']
+                    .sum().reset_index()
+                    .rename(columns={'item': 'Item', 'unidade_medida': 'Unidade', 'quantidade': 'Saldo'})
+                )
                 st.dataframe(resumo, use_container_width=True, hide_index=True)
 
-        st.dataframe(
-            buscador.df_filtrado.sort_values('Data Mov.', ascending=False),
-            use_container_width=True,
-            hide_index=True
-        )
+            st.dataframe(
+                df_filtrado.sort_values('data_mov', ascending=False),
+                use_container_width=True,
+                hide_index=True
+            )
 
-    # --- FORMULÁRIO DE MOVIMENTAÇÃO (só aparece após clicar num botão de ação) ---
+    # --- FORMULÁRIO DE MOVIMENTAÇÃO ---
     if st.session_state.mostrar_form:
         tipo = st.session_state.tipo_mov
         eh_ajuste = tipo in ("ENT-A", "SAI-A")
@@ -137,10 +147,9 @@ def renderizar_estoque():
         with st.form("form_movimentacao"):
             if eh_ajuste:
                 st.markdown("### 🛠️ Ajuste de estoque")
-                st.info("Informe a quantidade **real contada** no inventário. O sistema calcula a diferença automaticamente.")
+                st.info("Informe a quantidade **real contada**. O sistema calcula a diferença automaticamente.")
 
-                analisador = AnalisadorEstoque(df_movimentacoes)
-                saldo_dict = analisador.saldo_atual.to_dict()
+                saldo_dict = df_saldo.set_index('item')['saldo'].to_dict() if not df_saldo.empty else {}
                 itens_disponiveis = sorted(saldo_dict.keys())
 
                 c1, c2 = st.columns(2)
@@ -160,9 +169,8 @@ def renderizar_estoque():
                 st.markdown(f"### Registro: **{tipo}**")
                 c1, c2 = st.columns(2)
 
-                from logic_estoque import GestorRegras
                 gestor = GestorRegras(df_cadastro.to_dict('records')) if not df_cadastro.empty else None
-                itens_cadastrados = sorted(df_cadastro['Item'].dropna().tolist()) if not df_cadastro.empty else []
+                itens_cadastrados = sorted(df_cadastro['item'].dropna().tolist()) if not df_cadastro.empty else []
 
                 with c1:
                     if itens_cadastrados:
@@ -194,39 +202,51 @@ def renderizar_estoque():
             btn_col1, btn_col2 = st.columns(2)
             with btn_col1:
                 if st.form_submit_button("✅ Salvar", use_container_width=True):
-                    gerenciador = GerenciadorMovimentacao(df_movimentacoes)
+                    now = datetime.now(fuso_brasil)
 
                     if eh_ajuste:
-                        linha_final, diferenca = gerenciador.preparar_linha_ajuste(
-                            item=item,
-                            qtd_contada=qtd_contada,
-                            df_saldo_atual=saldo_dict,
-                            motivo=motivo
-                        )
-                        if linha_final is None:
-                            st.warning("Quantidade contada igual ao saldo do sistema. Nenhum ajuste necessário.")
+                        saldo_atual = saldo_dict.get(item, 0)
+                        diferenca = qtd_contada - saldo_atual
+                        if diferenca == 0:
+                            st.warning("Quantidade igual ao saldo. Nenhum ajuste necessário.")
                             st.stop()
+                        codigo = "ENT-A" if diferenca > 0 else "SAI-A"
+                        qtd_final = abs(diferenca)
+                        lote_final = f"Ajuste: {motivo}"
+                        un_final = ""
+                        un_compra_final = ""
+                        custo_final = 0.0
+                        validade_final = None
                     else:
-                        linha_final = gerenciador.preparar_linha(
-                            codigo=tipo,
-                            item=item,
-                            qtd=qtd,
-                            unidade_medida=un_medida,
-                            unidade_compra=un_compra,
-                            custo_unitario=custo,
-                            validade=validade.strftime("%d/%m/%Y") if validade else "",
-                            lote=lote
-                        )
+                        codigo = tipo
+                        qtd_final = qtd
+                        lote_final = lote
+                        un_final = un_medida
+                        un_compra_final = un_compra
+                        custo_final = custo / fator if fator else custo
+                        validade_final = validade.isoformat() if validade else None
 
-                    try:
-                        db = Database()
-                        aba = db.conectar_aba("Controle", "Movimentações")
-                        aba.append_row(linha_final)
-                        st.success(f"Movimentação registrada! ID: {linha_final[0]}")
+                    qtd_sinal = -abs(qtd_final) if codigo.startswith("SAI") else abs(qtd_final)
+
+                    linha = {
+                        "id_mov": f"{'1' if codigo.startswith('ENT') else '2'}{now.strftime('%Y%m%d%H%M%S')}",
+                        "data_mov": now.strftime("%Y-%m-%d %H:%M:%S"),
+                        "tipo": codigo,
+                        "item": item,
+                        "quantidade": qtd_sinal,
+                        "unidade_medida": un_final,
+                        "unidade_compra": un_compra_final,
+                        "validade": validade_final,
+                        "lote": lote_final,
+                        "custo_unitario": round(custo_final, 6),
+                        "custo_total": round(abs(qtd_final) * custo_final, 4),
+                    }
+
+                    if db.salvar_movimentacao(linha):
+                        st.success(f"Movimentação registrada! ID: {linha['id_mov']}")
                         st.session_state.mostrar_form = False
+                        st.cache_data.clear()
                         st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao salvar: {e}")
 
             with btn_col2:
                 if st.form_submit_button("❌ Cancelar", use_container_width=True):

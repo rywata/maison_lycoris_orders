@@ -6,12 +6,14 @@ from datetime import datetime
 import streamlit as st
 from oauth2client.service_account import ServiceAccountCredentials
 
-# --- CONFIGURAÇÕES INICIAIS ---
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-
 # Conexão Google via Secrets
-google_info = st.secrets["google_creds"]
-creds = ServiceAccountCredentials.from_json_keyfile_dict(google_info, scope)
+google_info = dict(st.secrets["gcp_service_account"])
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+info = dict(st.secrets["gcp_service_account"])
+raw_key = info["private_key"].strip()
+lines = [line.strip() for line in raw_key.split('\n')]
+info["private_key"] = '\n'.join(lines).replace("\\n", "\n")
+creds = ServiceAccountCredentials.from_json_keyfile_dict(info, scope)
 gc = gspread.authorize(creds)
 planilha = gc.open("Controle")
 

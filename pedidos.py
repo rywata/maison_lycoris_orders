@@ -2,48 +2,37 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from logic_pedidos import Carrinho
-from database import Database, salvar_pedido
-from logic_producao import GerenciadorProducao
+from logic_producao import GerenciadorProducao, CalculadorCustos
+from database import Database
 import pytz
 
 fuso_brasil = pytz.timezone('America/Sao_Paulo')
 
 def renderizar_novo_pedido():
-    # --- 1. CONEXÃO ---
-    @st.cache_resource
-    def iniciar_conexao():
-        db = Database() 
-        return db.conectar_aba("Controle", "Pedidos")
 
-    try:
-        aba_pedidos = iniciar_conexao()
-    except Exception as e:
-        st.error(f"Erro de conexão: {e}")
-        return
-
-    # --- 2. ESTADO E CARDÁPIO ---
-    if 'carrinho' not in st.session_state: 
+    if 'carrinho' not in st.session_state:
         st.session_state.carrinho = []
-    if 'pedido_enviado' not in st.session_state:
-        st.session_state.pedido_enviado = False
 
     cardapio = {
         "Pão de Leite": 15.0, "Pão Integral": 17.0, "Pão Semi Integral": 17.0, "Shokupan": 17.0,
-        "Pastel de Nata": 7.0, "Pastel de Maçã": 7.0, "Pastel de Ricota com Ervas Finas": 7.0, "Pastel de Frango com Parmesão": 7.0
+        "Pastel de Nata": 7.0, "Pastel de Maçã": 7.0, "Pastel de Ricota com Ervas Finas": 7.0,
+        "Pastel de Frango com Parmesão": 7.0
     }
     codigo_pasteis = [k for k in cardapio.keys() if "Pastel" in k]
 
-    # --- 3. DADOS DO CLIENTE ---
+    # --- DADOS DO CLIENTE ---
     st.header("📝 Novo Pedido")
-    
+
     with st.container():
         col1, col2 = st.columns(2)
         with col1:
-            nome_cliente = st.text_input("Nome do Cliente", placeholder="Ex: Zé Bedeu", key="input_nome_cliente")
+            nome_cliente = st.text_input("Nome do Cliente", placeholder="Ex: Zé Bedeu",
+                                          key="input_nome_cliente")
         with col2:
-            data_sel = st.date_input("Data de Entrega", value=datetime.now(fuso_brasil), format="DD/MM/YYYY")
+            data_sel = st.date_input("Data de Entrega", value=datetime.now(fuso_brasil),
+                                      format="DD/MM/YYYY")
 
-    # --- 4. ADICIONAR PRODUTOS ---
+    # --- ADICIONAR PRODUTOS ---
     st.divider()
     st.subheader("Adicionar Produtos")
     c_prod, c_qtd, c_add = st.columns([3, 1, 1])
@@ -56,33 +45,34 @@ def renderizar_novo_pedido():
         st.write(" ")
         if st.button("➕ Adicionar", use_container_width=True):
             if nome_cliente:
-                novo_item = {
+                st.session_state.carrinho.append({
                     "produto": produto,
                     "qtd": qtd,
                     "preco_unitario": cardapio[produto],
                     "subtotal": qtd * cardapio[produto]
-                }
-                st.session_state.carrinho.append(novo_item)
+                })
                 st.toast(f"{produto} adicionado!", icon="🛒")
             else:
                 st.warning("Preencha o nome do cliente antes de adicionar itens!")
-    
-    # --- 5. EDITOR DO CARRINHO E EXECUçÂO ---
+
+    # --- CARRINHO ---
     if st.session_state.carrinho:
         st.divider()
         st.subheader("🛒 Revisão do Pedido")
-        st.info("💡 Você pode alterar a quantidade ou excluir linhas (selecione a linha e aperte Delete).")
-        
+        st.info("💡 Você pode alterar a quantidade ou excluir linhas (selecione e aperte Delete).")
+
         df_carrinho = pd.DataFrame(st.session_state.carrinho)
         df_editado = st.data_editor(
             df_carrinho,
-            num_rows="dynamic", 
+            num_rows="dynamic",
             use_container_width=True,
             column_config={
                 "produto": "Produto",
                 "qtd": st.column_config.NumberColumn("Quantidade", min_value=1),
-                "preco_unitario": st.column_config.NumberColumn("Preço Unit.", format="R$ %.2f", disabled=True),
-                "subtotal": st.column_config.NumberColumn("Subtotal", format="R$ %.2f", disabled=True),
+                "preco_unitario": st.column_config.NumberColumn("Preço Unit.", format="R$ %.2f",
+                                                                  disabled=True),
+                "subtotal": st.column_config.NumberColumn("Subtotal", format="R$ %.2f",
+                                                           disabled=True),
             },
             hide_index=True,
             key="editor_carrinho"
@@ -92,9 +82,8 @@ def renderizar_novo_pedido():
             st.session_state.carrinho = df_editado.to_dict('records')
             st.rerun()
 
-        # --- CÁLCULO DE TOTAIS ---
         meu_carrinho = Carrinho(df_editado.to_dict('records'), codigo_pasteis)
-        
+
         c1, c2 = st.columns(2)
         with c1:
             st.metric("Total a Pagar", f"R$ {meu_carrinho.total_final:.2f}")
@@ -102,9 +91,9 @@ def renderizar_novo_pedido():
             if meu_carrinho.desconto_total > 0:
                 st.write(f"🎁 Desconto Combo: -R$ {meu_carrinho.desconto_total:.2f}")
 
-        # --- 6. FINALIZAÇÃO ---
+        # --- FINALIZAÇÃO ---
         col_cancelar, col_enviar = st.columns(2)
-        
+
         with col_cancelar:
             if st.button("🗑️ Cancelar Pedido", use_container_width=True):
                 st.session_state.carrinho = []
@@ -114,77 +103,96 @@ def renderizar_novo_pedido():
             if st.button("🚀 FINALIZAR E ENVIAR", type="primary", use_container_width=True):
                 id_p = datetime.now(fuso_brasil).strftime("%Y%m%d%H%M")
                 dt_in = datetime.now(fuso_brasil).strftime("%Y-%m-%d %H:%M:%S")
-                
-                dados_para_planilha = []
+                db = Database()
+
+                # --- MONTA LINHAS DO PEDIDO ---
+                linhas_pedido = []
                 for _, row in df_editado.iterrows():
-                    # Lógica de desconto individual para a planilha
                     tem_desc = meu_carrinho.tem_desconto and row['produto'] in codigo_pasteis
-                    d_i = float((row['qtd'] * row['preco_unitario'] * 0.15) if tem_desc else 0.0)
+                    desconto = float(row['qtd'] * row['preco_unitario'] * 0.15) if tem_desc else 0.0
                     bruto = float(row['qtd'] * row['preco_unitario'])
-                    
-                    dados_para_planilha.append([
-                        id_p, 
-                        nome_cliente, 
-                        data_sel.isoformat(), 
-                        row['produto'], 
-                        int(row['qtd']), 
-                        bruto, 
-                        d_i, 
-                        float(bruto - d_i), 
-                        dt_in
-                    ])
-                
-                if salvar_pedido(aba_pedidos, dados_para_planilha):
-                    try:
-                        db = Database()
-                        aba_mov = db.conectar_aba("Controle", "Movimentações")
-                        aba_prod = db.conectar_aba("Controle", "Produção")
-                        aba_receitas = db.conectar_aba("Controle", "Receitas Python")
-                        aba_precos = db.conectar_aba("Controle", "Preço Insumos")
+                    linhas_pedido.append({
+                        "id_pedido": id_p,
+                        "nome_cliente": nome_cliente,
+                        "data_entrega": data_sel.isoformat(),
+                        "produto": row['produto'],
+                        "quantidade": int(row['qtd']),
+                        "total_bruto": bruto,
+                        "desconto": desconto,
+                        "total_liquido": bruto - desconto,
+                        "data_pedido": dt_in,
+                    })
 
-                        df_mov = pd.DataFrame(aba_mov.get_all_records())
-                        df_receitas = pd.DataFrame(aba_receitas.get_all_records())
-                        df_precos = pd.DataFrame(
-                            aba_precos.get_all_records(value_render_option='UNFORMATTED_VALUE')
+                if not db.salvar_pedido(linhas_pedido):
+                    st.error("Erro ao salvar pedido.")
+                    st.stop()
+
+                # --- DISPARA PRODUÇÃO ---
+                try:
+                    df_receitas = db.receitas()
+                    df_precos = db.precos()
+                    df_mov = db.movimentacoes()
+
+                    calc = CalculadorCustos(df_precos)
+                    produtor = GerenciadorProducao(df_receitas, df_mov)
+
+                    todas_mov = []
+                    todas_prod = []
+
+                    for _, row in df_editado.iterrows():
+                        linhas_mov, erro = produtor.gerar_movimentacoes(
+                            id_pedido=id_p,
+                            nome_produto=row['produto'].upper(),
+                            quantidade=int(row['qtd']),
+                            calculador=calc
                         )
+                        if erro:
+                            st.warning(f"⚠️ {row['produto']}: {erro}. Estoque não movimentado.")
+                            continue
 
-                        from logic_producao import CalculadorCustos
-                        calc = CalculadorCustos(df_precos)
-                        produtor = GerenciadorProducao(df_receitas, df_mov)
+                        # SAI-P dos ingredientes
+                        for linha in linhas_mov[:-1]:
+                            todas_mov.append({
+                                "id_mov": linha[0],
+                                "data_mov": linha[1],
+                                "tipo": linha[2],
+                                "item": linha[3],
+                                "quantidade": linha[4],
+                                "unidade_medida": linha[5],
+                                "unidade_compra": linha[6],
+                                "validade": linha[7] if linha[7] else None,
+                                "lote": linha[8],
+                                "custo_unitario": linha[9],
+                                "custo_total": linha[10],
+                            })
 
-                        todas_mov = []
-                        todas_prod = []
+                        ordem = produtor.gerar_ordem_producao(
+                            id_pedido=id_p,
+                            nome_produto=row['produto'],
+                            quantidade=int(row['qtd']),
+                            data_entrega=data_sel.isoformat()
+                        )
+                        todas_prod.append({
+                            "id_producao": ordem[0],
+                            "id_pedido": ordem[1],
+                            "data_producao": ordem[2],
+                            "produto": ordem[3],
+                            "quantidade": ordem[4],
+                            "data_entrega": ordem[5],
+                            "status": ordem[6],
+                        })
 
-                        for _, row in df_editado.iterrows():
-                            linhas_mov, erro = produtor.gerar_movimentacoes(
-                                id_pedido=id_p,
-                                nome_produto=row['produto'].upper(),
-                                quantidade=int(row['qtd']),
-                                calculador=calc
-                            )
-                            if erro:
-                                st.warning(f"⚠️ {row['produto']}: {erro}. Estoque não movimentado.")
-                                continue
+                    if todas_mov:
+                        db.salvar_movimentacoes_lote(todas_mov)
+                    if todas_prod:
+                        db.salvar_ordens_lote(todas_prod)
 
-                            todas_mov.extend(linhas_mov[:-1])
-                            todas_prod.append(produtor.gerar_ordem_producao(
-                                id_pedido=id_p,
-                                nome_produto=row['produto'],
-                                quantidade=int(row['qtd']),
-                                data_entrega=data_sel.isoformat()
-                            ))
+                except Exception as e:
+                    st.warning(f"Pedido salvo, mas erro ao gerar produção: {e}")
 
-                        if todas_mov:
-                            aba_mov.append_rows(todas_mov, value_input_option='USER_ENTERED')
-                        if todas_prod:
-                            aba_prod.append_rows(todas_prod, value_input_option='USER_ENTERED')
-
-                    except Exception as e:
-                        st.warning(f"Pedido salvo, mas erro ao gerar produção: {e}")
-
-                    st.session_state.carrinho = []
-                    st.session_state.pop("input_nome_cliente", None)
-                    st.success("✅ Pedido enviado! Produção aguardando confirmação.")
-                    import time
-                    time.sleep(2)
-                    st.rerun()
+                st.session_state.carrinho = []
+                st.session_state.pop("input_nome_cliente", None)
+                st.success("✅ Pedido enviado! Produção aguardando confirmação.")
+                import time
+                time.sleep(2)
+                st.rerun()

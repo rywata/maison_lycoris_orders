@@ -1,56 +1,136 @@
 import streamlit as st
 import pandas as pd
 from database import Database
-from logic_historico_pedidos import HistoricoFiltro
+from datetime import date
+
+@st.cache_data(ttl=60)
+def carregar_pedidos():
+    return Database().pedidos()
 
 def renderizar_historico():
     st.title("📂 Histórico de Pedidos")
 
-    # 1. Carga e Preparação
-    try:
-        db = Database()
-        df = pd.DataFrame(db.conectar_aba("Controle", "Pedidos").get_all_records())
-        
-        if df.empty:
-            st.warning("A planilha está vazia.")
-            return
+    df = carregar_pedidos()
 
-        df.columns = df.columns.str.strip()
-        df['Data Pedido'] = pd.to_datetime(df['Data Pedido'], dayfirst=True).dt.date
-        df['Valor Numérico'] = (
-            df['Total Item Líquido']
-            .astype(str)
-            .str.replace('R$', '', regex=False)
-            .str.replace('.', '', regex=False)
-            .str.replace(',', '.', regex=False)
-            .astype(float)
-        )
-    except Exception as e:
-        st.error(f"Erro na carga de dados: {e}")
+    if df.empty:
+        st.warning("Nenhum pedido encontrado.")
         return
 
-    # 2. Instanciando a Lógica
-    historico = HistoricoFiltro(df)
+    # Normaliza colunas (SQL retorna minúsculo)
+    df.columns = [c.lower() for c in df.columns]
+    df['data_pedido'] = pd.to_datetime(df['data_pedido'], errors='coerce').dt.date
+    df['data_entrega'] = pd.to_datetime(df['data_entrega'], errors='coerce').dt.date
+    df['total_liquido'] = pd.to_numeric(df['total_liquido'], errors='coerce').fillna(0)
 
-    # 3. Interface de Filtros (Sidebar)
+    # --- FILTROS NA SIDEBAR ---
     with st.sidebar:
         st.header("🔍 Filtros")
+
         busca_nome = st.text_input("Nome do Cliente").strip()
-        produto_sel = st.selectbox("Produto", ["Todos"] + sorted(list(df['Produto'].unique())))
-        
-        intervalo = st.date_input(
-            "Intervalo de Datas",
-            value=(df['Data Pedido'].min(), df['Data Pedido'].max())
+
+        produtos_disponiveis = ["Todos"] + sorted(df['produto'].dropna().unique().tolist())
+        produto_sel = st.selectbox("Produto", produtos_disponiveis)
+
+        data_min = df['data_pedido'].min() or date.today()
+        data_max = df['data_pedido'].max() or date.today()
+        intervalo = st.date_input("Intervalo de Datas", value=(data_min, data_max))
+
+    # --- FILTRAGEM ---
+    df_filtrado = df.copy()
+
+    if busca_nome:
+        df_filtrado = df_filtrado[
+            df_filtrado['nome_cliente'].str.contains(busca_nome, case=False, na=False)
+        ]
+
+    if produto_sel != "Todos":
+        df_filtrado = df_filtrado[df_filtrado['produto'] == produto_sel]
+
+    if isinstance(intervalo, (list, tuple)) and len(intervalo) == 2:
+        inicio, fim = intervalo
+        df_filtrado = df_filtrado[
+            (df_filtrado['data_pedido'] >= inicio) &
+            (df_filtrado['data_pedido'] <= fim)
+        ]
+
+    # --- MÉTRICAS ---
+    # Agrupa por pedido para não contar linhas duplicadas
+    pedidos_unicos = df_filtrado.groupby('id_pedido')['total_liquido'].sum()
+    total_pedidos = len(pedidos_unicos)
+    faturamento = pedidos_unicos.sum()
+
+    col1, col2 = st.columns(2)
+    col1.metric("Pedidos Localizados", total_pedidos)
+    col2.metric("Faturamento Total", f"R$ {faturamento:,.2f}")
+
+    st.divider()
+
+    # --- TABELA ---
+    colunas_visiveis = {
+        'data_pedido': 'Data Pedido',
+        'nome_cliente': 'Cliente',
+        'produto': 'Produto',
+        'quantidade': 'Qtd',
+        'total_bruto': 'Bruto',
+        'desconto': 'Desconto',
+        'total_liquido': 'Total Líquido',
+        'data_entrega': 'Data Entrega',
+    }
+
+    df_exibir = df_filtrado[list(colunas_visiveis.keys())].rename(columns=colunas_visiveis)
+
+    st.dataframe(
+        df_exibir.sort_values('Data Pedido', ascending=False),
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Bruto": st.column_config.NumberColumn(format="R$ %.2f"),
+            "Desconto": st.column_config.NumberColumn(format="R$ %.2f"),
+            "Total Líquido": st.column_config.NumberColumn(format="R$ %.2f"),
+        }
+    )
+
+    st.divider()
+
+    # --- RESUMO POR PRODUTO ---
+    with st.expander("📊 Resumo por produto"):
+        resumo = (
+            df_filtrado.groupby('produto')
+            .agg(
+                Pedidos=('id_pedido', 'nunique'),
+                Quantidade=('quantidade', 'sum'),
+                Faturamento=('total_liquido', 'sum')
+            )
+            .reset_index()
+            .rename(columns={'produto': 'Produto'})
+            .sort_values('Faturamento', ascending=False)
+        )
+        st.dataframe(
+            resumo,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Faturamento": st.column_config.NumberColumn(format="R$ %.2f"),
+            }
         )
 
-    # 4. Executando a Lógica de Filtragem
-    historico.filtrar(busca_nome, produto_sel, intervalo)
-
-    # 5. Dashboard
-    col1, col2 = st.columns(2)
-    col1.metric("Pedidos Localizados", historico.total_pedidos)
-    col2.metric("Soma Total", f"R$ {historico.faturamento_total:,.2f}")
-
-    # 6. Exibição da Tabela
-    colunas_visiveis = ['Data Pedido', 'Nome Cliente', 'Produto', 'Quantidade', 'Total Item Líquido', 'Data Entrega']
-    st.dataframe(historico.df_filtrado[colunas_visiveis], use_container_width=True, hide_index=True)
+    # --- RESUMO POR CLIENTE ---
+    with st.expander("👥 Resumo por cliente"):
+        por_cliente = (
+            df_filtrado.groupby('nome_cliente')
+            .agg(
+                Pedidos=('id_pedido', 'nunique'),
+                Faturamento=('total_liquido', 'sum')
+            )
+            .reset_index()
+            .rename(columns={'nome_cliente': 'Cliente'})
+            .sort_values('Faturamento', ascending=False)
+        )
+        st.dataframe(
+            por_cliente,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Faturamento": st.column_config.NumberColumn(format="R$ %.2f"),
+            }
+        )
