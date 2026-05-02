@@ -171,10 +171,18 @@ class CalculadorCustos:
         item_norm = normalizar(item)
         item_original = self.mapa_itens.get(item_norm)
 
-        if item_original and item_original in self._idx.index:
-            return float(self._idx.loc[item_original, 'Custo Unitário'])
+        try:
+            if item_original and item_original in self._idx.index:
+                valor = self._idx.loc[item_original, 'Custo Unitário']
 
-        return None
+                if isinstance(valor, pd.Series):
+                    return float(valor.iloc[0])
+                return float(valor)
+        except Exception as e:
+            print(f"Erro ao buscar custo do item {item}: {e}")
+            return 0.0
+
+        return 0.0
 
     def calcular_custo_receita(self, insumos):
         linhas = []
