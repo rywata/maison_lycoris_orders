@@ -241,7 +241,7 @@ def renderizar_producao():
 def _confirmar_producao(row, df_movimentacoes, df_precos, df_receitas):
     try:
         db = Database()
-        calc = CalculadorCustos(db.precos())  
+        calc = CalculadorCustos(db.precos())
 
         gestor = GerenciadorStatusProducao(
             pd.DataFrame(),
@@ -256,22 +256,8 @@ def _confirmar_producao(row, df_movimentacoes, df_precos, df_receitas):
             data_entrega=row.get('data_entrega', '')
         )
 
-        # Salva ENT-P no estoque
-        db.salvar_movimentacao({
-            "id_mov": linha_mov[0],
-            "data_mov": linha_mov[1],
-            "tipo": linha_mov[2],
-            "item": linha_mov[3],
-            "quantidade": linha_mov[4],
-            "unidade_medida": linha_mov[5],
-            "unidade_compra": linha_mov[6],
-            "validade": linha_mov[7] if linha_mov[7] else None,
-            "lote": linha_mov[8],
-            "custo_unitario": linha_mov[9],
-            "custo_total": linha_mov[10],
-        })
+        db.salvar_movimentacao(linha_mov)
 
-        # Atualiza status direto no Supabase — sem buscar linha por linha
         db.atualizar_status_producao(row['id_producao'], novo_status)
 
         st.session_state._producao_confirmada = True

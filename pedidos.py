@@ -150,21 +150,7 @@ def renderizar_novo_pedido():
                             st.warning(f"⚠️ {row['produto']}: {erro}. Estoque não movimentado.")
                             continue
 
-                        # SAI-P dos ingredientes
-                        for linha in linhas_mov[:-1]:
-                            todas_mov.append({
-                                "id_mov": linha[0],
-                                "data_mov": linha[1],
-                                "tipo": linha[2],
-                                "item": linha[3],
-                                "quantidade": linha[4],
-                                "unidade_medida": linha[5],
-                                "unidade_compra": linha[6],
-                                "validade": linha[7] if linha[7] else None,
-                                "lote": linha[8],
-                                "custo_unitario": linha[9],
-                                "custo_total": linha[10],
-                            })
+                        todas_mov.extend(linhas_mov[:-1])
 
                         ordem = produtor.gerar_ordem_producao(
                             id_pedido=id_p,
