@@ -36,13 +36,7 @@ class GerenciadorProducao:
         receita = self.receitas[mask]
         if receita.empty:
             return None
-
-        nome_norm = nome_produto.upper()
-        
-        if "PASTEL" in nome_norm:
-            rendimento = 10
-        else:
-            rendimento = 1
+        rendimento = 1
 
         fator_multiplicador = quantidade / rendimento
         return [
