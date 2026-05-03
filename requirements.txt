@@ -6,3 +6,4 @@ supabase
 postgrest
 toml
 qrcode
+pytz
