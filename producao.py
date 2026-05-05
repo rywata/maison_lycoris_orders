@@ -144,18 +144,28 @@ def renderizar_producao():
                 id_ref = st.text_input("Referência (opcional)", placeholder="Ex: Fornada extra")
 
             # Preview de custo via SQL
+            
             if produto:
                 db = Database()
                 df_custo = db.custo_receita(produto, quantidade)
-                if not df_custo.empty:
-                    st.markdown("**Insumos e custos estimados:**")
-                    st.dataframe(
-                        df_custo[['item_insumo', 'qtd_total', 'unidade', 'custo_total']],
-                        use_container_width=True,
-                        hide_index=True
-                    )
-                    total = db.custo_total_receita(produto, quantidade)
+    
+            if not df_custo.empty:
+                st.markdown("**Insumos e custos estimados:**")
+                df_exibir = df_custo[['item_insumo', 'qtd_total', 'unidade', 'custo_total']].copy()
+                
+                st.dataframe(
+                    df_exibir,
+                    use_container_width=True,
+                    hide_index=True
+                )
+                
+                total = db.custo_total_receita(produto, quantidade)
+                
+                if total > 0:
                     st.metric("Custo total estimado", f"R$ {total:.2f}")
+                else:
+                    st.warning("⚠️ Alguns insumos desta receita estão sem preço cadastrado.")
+
 
             btn1, btn2 = st.columns(2)
             with btn1:
@@ -172,7 +182,6 @@ def renderizar_producao():
                         if erro:
                             st.error(erro)
                         else:
-                            # linhas_mov já são dicts — passa direto
                             db.salvar_movimentacoes_lote(linhas_mov)
 
                             ordem = produtor.gerar_ordem_producao(
