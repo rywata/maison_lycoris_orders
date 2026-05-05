@@ -126,13 +126,17 @@ class Database:
         })
 
     def custo_total_receita(self, produto, quantidade):
-        df = self.rpc("custo_total_receita", {
-            "p_produto": produto,
-            "p_quantidade": quantidade
-        })
-        if not df.empty:
-            return float(df.iloc[0, 0])
-        return 0.0
+        try:
+            response = self.rpc("custo_total_receita", {
+                "p_produto": produto,
+                "p_quantidade": quantidade
+            }).execute()
+            if response.data is not None:
+                return float(response.data)
+            return 0.0
+        except Exception as e:
+            st.error(f"Erro ao chamar função custo_total_receita: {e}")
+            return 0.0
 
     # --- CADASTROS ---
     def insumos(self):

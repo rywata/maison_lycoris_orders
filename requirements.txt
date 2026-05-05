@@ -1,9 +1,4 @@
 streamlit
 pandas
-gspread
-oauth2client
 supabase
-postgrest
-toml
-qrcode
 pytz

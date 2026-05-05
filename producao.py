@@ -172,24 +172,9 @@ def renderizar_producao():
                         if erro:
                             st.error(erro)
                         else:
-                            # Salva movimentações
-                            movs_dict = []
-                            for linha in linhas_mov:
-                                movs_dict.append({
-                                    "id_mov": linha[0],
-                                    "data_mov": linha[1],
-                                    "tipo": linha[2],
-                                    "item": linha[3],
-                                    "quantidade": linha[4],
-                                    "unidade_medida": linha[5],
-                                    "unidade_compra": linha[6],
-                                    "validade": linha[7] if linha[7] else None,
-                                    "lote": linha[8],
-                                    "custo_unitario": linha[9],
-                                    "custo_total": linha[10],
-                                })
+                            # linhas_mov já são dicts — passa direto
+                            db.salvar_movimentacoes_lote(linhas_mov)
 
-                            # Gera ordem já como Concluído
                             ordem = produtor.gerar_ordem_producao(
                                 id_ref_final, produto, quantidade, data_entrega.isoformat()
                             )
@@ -203,9 +188,7 @@ def renderizar_producao():
                                 "status": "Concluído",
                             }
 
-                            db.salvar_movimentacoes_lote(movs_dict)
                             db.salvar_ordem_producao(ordem_dict)
-
                             st.success(f"Produção de {quantidade}x {produto} registrada!")
                             st.session_state.mostrar_form_producao = False
                             st.cache_data.clear()
