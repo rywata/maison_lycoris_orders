@@ -137,33 +137,28 @@ def renderizar_producao():
         c1, c2 = st.columns(2)
         with c1:
             produto = st.selectbox("Produto", produtos_disponiveis, key="sel_prod_manual")
-            quantidade = st.number_input("Quantidade produzida", min_value=1, step=1, value=1)
+            quantidade = st.number_input("Quantidade produzida", min_value=1, step=1,
+                                          value=1, key="qtd_prod_manual")
         with c2:
-            data_entrega = st.date_input("Data de entrega")
-            id_ref = st.text_input("Referência (opcional)", placeholder="Ex: Fornada extra")
-
+            data_entrega = st.date_input("Data de entrega", key="data_prod_manual")
+            id_ref = st.text_input("Referência (opcional)", placeholder="Ex: Fornada extra",
+                                    key="ref_prod_manual")
         # Preview de custo via SQL
-        if produto:
-            db = Database()
-            df_custo = db.custo_receita(produto, quantidade)
+        db = Database()
+        df_custo = db.custo_receita(produto, quantidade)
+        if not df_custo.empty:
+            st.markdown("**Insumos e custos estimados:**")
+            st.dataframe(
+                df_custo[['item_insumo', 'qtd_total', 'unidade', 'custo_total']],
+                use_container_width=True,
+                hide_index=True
+            )
+            total = db.custo_total_receita(produto, quantidade)
+            if total > 0:
+                st.metric("Custo total estimado", f"R$ {total:.2f}")
+            else:
+                st.warning("⚠️ Alguns insumos estão sem preço cadastrado.")
 
-            if not df_custo.empty:
-                st.markdown("**Insumos e custos estimados:**")
-                df_exibir = df_custo[['item_insumo', 'qtd_total', 'unidade', 'custo_total']].copy()
-                
-                st.dataframe(
-                    df_exibir,
-                    use_container_width=True,
-                    hide_index=True
-                )
-                
-                total = db.custo_total_receita(produto, quantidade)
-                
-                if total > 0:
-                    st.metric("Custo total estimado", f"R$ {total:.2f}")
-                else:
-                    st.warning("⚠️ Alguns insumos desta receita estão sem preço cadastrado.")
-        
         with st.form("confirmar_producao"):
             btn1, btn2 = st.columns(2)
             with btn1:
@@ -172,10 +167,13 @@ def renderizar_producao():
                         db = Database()
                         calc = CalculadorCustos(df_precos)
                         produtor = GerenciadorProducao(df_receitas, df_movimentacoes)
-                        id_ref_final = id_ref if id_ref else "Avulso"
+                        id_ref_final = st.session_state.get("ref_prod_manual", "") or "Avulso"
+                        produto_final = st.session_state.get("sel_prod_manual", produto)
+                        quantidade_final = st.session_state.get("qtd_prod_manual", quantidade)
+                        data_final = st.session_state.get("data_prod_manual", data_entrega)
 
                         linhas_mov, erro = produtor.gerar_movimentacoes(
-                            id_ref_final, produto, quantidade, calculador=calc
+                            id_ref_final, produto_final, quantidade_final, calculador=calc
                         )
                         if erro:
                             st.error(erro)
@@ -183,9 +181,10 @@ def renderizar_producao():
                             db.salvar_movimentacoes_lote(linhas_mov)
 
                             ordem = produtor.gerar_ordem_producao(
-                                id_ref_final, produto, quantidade, data_entrega.isoformat()
+                                id_ref_final, produto_final, quantidade_final,
+                                data_final.isoformat()
                             )
-                            ordem_dict = {
+                            db.salvar_ordem_producao({
                                 "id_producao": ordem[0],
                                 "id_pedido": ordem[1],
                                 "data_producao": ordem[2],
@@ -193,10 +192,8 @@ def renderizar_producao():
                                 "quantidade": ordem[4],
                                 "data_entrega": ordem[5],
                                 "status": "Concluído",
-                            }
-
-                            db.salvar_ordem_producao(ordem_dict)
-                            st.success(f"Produção de {quantidade}x {produto} registrada!")
+                            })
+                            st.success(f"Produção registrada!")
                             st.session_state.mostrar_form_producao = False
                             st.cache_data.clear()
                             st.rerun()
@@ -207,7 +204,6 @@ def renderizar_producao():
                 if st.form_submit_button("❌ Cancelar", use_container_width=True):
                     st.session_state.mostrar_form_producao = False
                     st.rerun()
-
     # --- BUSCA ---
     if st.session_state.mostrar_busca_producao and not df_producao.empty:
         st.divider()
