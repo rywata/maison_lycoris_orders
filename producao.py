@@ -131,24 +131,22 @@ def renderizar_producao():
         st.divider()
         produtos_disponiveis = sorted(df_receitas['produto'].dropna().unique().tolist())
 
-        with st.form("form_producao"):
-            st.markdown("### 🍞 Registrar produção manual")
-            st.info("Use para registrar produções avulsas não vinculadas a um pedido.")
+        st.markdown("### 🍞 Registrar produção manual")
+        st.info("Use para registrar produções avulsas não vinculadas a um pedido.")
 
-            c1, c2 = st.columns(2)
-            with c1:
-                produto = st.selectbox("Produto", produtos_disponiveis)
-                quantidade = st.number_input("Quantidade produzida", min_value=1, step=1)
-            with c2:
-                data_entrega = st.date_input("Data de entrega")
-                id_ref = st.text_input("Referência (opcional)", placeholder="Ex: Fornada extra")
+        c1, c2 = st.columns(2)
+        with c1:
+            produto = st.selectbox("Produto", produtos_disponiveis, key="sel_prod_manual")
+            quantidade = st.number_input("Quantidade produzida", min_value=1, step=1, value=1)
+        with c2:
+            data_entrega = st.date_input("Data de entrega")
+            id_ref = st.text_input("Referência (opcional)", placeholder="Ex: Fornada extra")
 
-            # Preview de custo via SQL
-            
-            if produto:
-                db = Database()
-                df_custo = db.custo_receita(produto, quantidade)
-    
+        # Preview de custo via SQL
+        if produto:
+            db = Database()
+            df_custo = db.custo_receita(produto, quantidade)
+
             if not df_custo.empty:
                 st.markdown("**Insumos e custos estimados:**")
                 df_exibir = df_custo[['item_insumo', 'qtd_total', 'unidade', 'custo_total']].copy()
@@ -165,8 +163,8 @@ def renderizar_producao():
                     st.metric("Custo total estimado", f"R$ {total:.2f}")
                 else:
                     st.warning("⚠️ Alguns insumos desta receita estão sem preço cadastrado.")
-
-
+        
+        with st.form("confirmar_producao"):
             btn1, btn2 = st.columns(2)
             with btn1:
                 if st.form_submit_button("✅ Confirmar produção", use_container_width=True):
