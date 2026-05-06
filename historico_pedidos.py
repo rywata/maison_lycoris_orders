@@ -90,9 +90,8 @@ def renderizar_historico():
         return
 
     # --- MÉTRICAS ---
-    pedidos_unicos = df_filtrado.groupby('id_pedido')['total_liquido'].first()
-    total_pedidos = len(pedidos_unicos)
-    faturamento = pedidos_unicos.sum()
+    total_pedidos = df_filtrado['id_pedido'].nunique()
+    faturamento = df_filtrado['total_liquido'].sum()
 
     m1, m2 = st.columns(2)
     m1.metric("Pedidos Localizados", total_pedidos)
