@@ -24,13 +24,16 @@ def renderizar_novo_pedido():
     st.header("📝 Novo Pedido")
 
     with st.container():
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
             nome_cliente = st.text_input("Nome do Cliente", placeholder="Ex: Zé Bedeu",
                                           key="input_nome_cliente")
         with col2:
             data_sel = st.date_input("Data de Entrega", value=datetime.now(fuso_brasil),
                                       format="DD/MM/YYYY")
+        with col3:
+            horario_sel = st.time_input("Horário de Entrega",
+                                         value=datetime.now(fuso_brasil).replace(hour=9, minute=0, second=0).time())
 
     # --- ADICIONAR PRODUTOS ---
     st.divider()
@@ -115,6 +118,7 @@ def renderizar_novo_pedido():
                         "id_pedido": id_p,
                         "nome_cliente": nome_cliente,
                         "data_entrega": data_sel.isoformat(),
+                        "horario_entrega": horario_sel.strftime("%H:%M"),
                         "produto": row['produto'],
                         "quantidade": int(row['qtd']),
                         "total_bruto": bruto,
@@ -165,6 +169,7 @@ def renderizar_novo_pedido():
                             "produto": ordem[3],
                             "quantidade": ordem[4],
                             "data_entrega": ordem[5],
+                            'horario_entrega': 'Horário', 
                             "status": ordem[6],
                         })
 
