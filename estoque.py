@@ -144,7 +144,7 @@ def renderizar_estoque():
         eh_ajuste = tipo in ("ENT-A", "SAI-A")
         st.divider()
 
-        with st.form("form_movimentacao"):
+        with st.form("form_movimentacao_completo"):
             if eh_ajuste:
                 st.markdown("### 🛠️ Ajuste de estoque")
                 st.info("Informe a quantidade **real contada**. O sistema calcula a diferença automaticamente.")
@@ -169,7 +169,7 @@ def renderizar_estoque():
                 st.markdown(f"### Registro: **{tipo}**")
                 c1, c2 = st.columns(2)
 
-                gestor = GestorRegras(df_cadastro.to_dict('records')) if not df_cadastro.empty else None
+                gestor = GestorRegras(df_cadastro) if not df_cadastro.empty else None
                 itens_cadastrados = sorted(df_cadastro['item'].dropna().tolist()) if not df_cadastro.empty else []
 
                 with c1:
@@ -180,75 +180,81 @@ def renderizar_estoque():
                     else:
                         item = st.text_input("Item")
 
+                    # Preenchimento automático de unidades baseado na lógica de estoque
                     un_compra_default = gestor.obter_unidade_compra(item) if gestor and item else ""
                     un_receita_default = gestor.obter_unidade_receita(item) if gestor and item else ""
                     fator = gestor.obter_fator(item) if gestor and item else 1
 
-                    qtd_compra = st.number_input("Quantidade comprada", min_value=0.0, step=1.0, format="%.0f",
-                                                  help="Em unidades de compra. Ex: 2 sacos")
-                    un_compra = st.text_input("Unidade de Compra", value=un_compra_default)
+                    qtd_compra = st.number_input("Quantidade (Unidade de Compra)", min_value=0.0, step=1.0, format="%.0f")
+                    un_compra = st.text_input("Unidade de Compra (Ex: Saco, Caixa)", value=un_compra_default)
 
                 with c2:
-                    un_medida = st.text_input("Unidade de Receita", value=un_receita_default)
+                    un_medida = st.text_input("Unidade de Receita (Ex: kg, un)", value=un_receita_default)
                     qtd_convertida = qtd_compra * fator
-                    st.metric("Quantidade convertida", f"{qtd_convertida:.0f} {un_medida}",
-                              help="Calculado automaticamente pelo fator de conversão")
+                    st.metric("Quantidade convertida", f"{qtd_convertida:.3f} {un_medida}", 
+                              help="Conversão baseada no cadastro do insumo")
+                    
                     validade = st.date_input("Validade", value=None)
                     lote = st.text_input("Lote")
-                    custo = st.number_input("Custo Unitário (por unidade de compra)", min_value=0.0, step=0.01)
+                    custo = st.number_input("Custo Total da Compra (R$)", min_value=0.0, step=0.01)
 
                 qtd = qtd_convertida
 
+            # BOTÕES DE SUBMISSÃO OBRIGATÓRIOS DO FORMULÁRIO
             btn_col1, btn_col2 = st.columns(2)
             with btn_col1:
-                if st.form_submit_button("✅ Salvar", use_container_width=True):
-                    now = datetime.now(fuso_brasil)
+                salvar = st.form_submit_button("✅ Salvar Movimentação", use_container_width=True)
+            with btn_col2:
+                cancelar = st.form_submit_button("❌ Cancelar", use_container_width=True)
 
-                    if eh_ajuste:
-                        saldo_atual = saldo_dict.get(item, 0)
-                        diferenca = qtd_contada - saldo_atual
-                        if diferenca == 0:
-                            st.warning("Quantidade igual ao saldo. Nenhum ajuste necessário.")
-                            st.stop()
+            # LÓGICA DE PROCESSAMENTO APÓS CLIQUE EM SALVAR
+            if salvar:
+                now = datetime.now(fuso_brasil)
+                
+                if eh_ajuste:
+                    saldo_atual = saldo_dict.get(item, 0)
+                    diferenca = qtd_contada - saldo_atual
+                    if diferenca == 0:
+                        st.warning("Quantidade igual ao saldo. Nenhum ajuste necessário.")
+                    else:
                         codigo = "ENT-A" if diferenca > 0 else "SAI-A"
                         qtd_final = abs(diferenca)
                         lote_final = f"Ajuste: {motivo}"
-                        un_final = ""
+                        un_final = "" 
                         un_compra_final = ""
                         custo_final = 0.0
                         validade_final = None
-                    else:
-                        codigo = tipo
-                        qtd_final = qtd
-                        lote_final = lote
-                        un_final = un_medida
-                        un_compra_final = un_compra
-                        custo_final = custo / fator if fator else custo
-                        validade_final = validade.isoformat() if validade else None
+                else:
+                    codigo = tipo
+                    qtd_final = qtd
+                    lote_final = lote
+                    un_final = un_medida
+                    un_compra_final = un_compra
+                    custo_final = (custo / qtd_final) if qtd_final > 0 else 0.0
+                    validade_final = validade.isoformat() if validade else None
 
-                    qtd_sinal = -abs(qtd_final) if codigo.startswith("SAI") else abs(qtd_final)
+                qtd_sinal = -abs(qtd_final) if codigo.startswith("SAI") else abs(qtd_final)
 
-                    linha = {
-                        "id_mov": f"{'1' if codigo.startswith('ENT') else '2'}{now.strftime('%Y%m%d%H%M%S')}",
-                        "data_mov": now.strftime("%Y-%m-%d %H:%M:%S"),
-                        "tipo": codigo,
-                        "item": item,
-                        "quantidade": qtd_sinal,
-                        "unidade_medida": un_final,
-                        "unidade_compra": un_compra_final,
-                        "validade": validade_final,
-                        "lote": lote_final,
-                        "custo_unitario": round(custo_final, 6),
-                        "custo_total": round(abs(qtd_final) * custo_final, 4),
-                    }
+                linha = {
+                    "id_mov": f"{'1' if codigo.startswith('ENT') else '2'}{now.strftime('%Y%m%d%H%M%S')}",
+                    "data_mov": now.strftime("%Y-%m-%d %H:%M:%S"),
+                    "tipo": codigo,
+                    "item": item,
+                    "quantidade": qtd_sinal,
+                    "unidade_medida": un_final,
+                    "unidade_compra": un_compra_final,
+                    "validade": validade_final,
+                    "lote": lote_final,
+                    "custo_unitario": round(float(custo_final), 6),
+                    "custo_total": round(abs(qtd_final) * custo_final, 4),
+                }
 
-                    if db.salvar_movimentacao(linha):
-                        st.success(f"Movimentação registrada! ID: {linha['id_mov']}")
-                        st.session_state.mostrar_form = False
-                        st.cache_data.clear()
-                        st.rerun()
-
-            with btn_col2:
-                if st.form_submit_button("❌ Cancelar", use_container_width=True):
+                if db.salvar_movimentacao(linha):
+                    st.success(f"Sucesso! {codigo} registrado.")
                     st.session_state.mostrar_form = False
+                    st.cache_data.clear()
                     st.rerun()
+
+            if cancelar:
+                st.session_state.mostrar_form = False
+                st.rerun()

@@ -6,10 +6,7 @@ fuso_brasil = pytz.timezone('America/Sao_Paulo')
 
 class GerenciadorMovimentacao:
     def __init__(self, df_movimentacoes_atual=None):
-        """
-        Inicializa o gerenciador. 
-        Se receber um DataFrame do SQL, normaliza as colunas para minúsculo.
-        """
+
         if df_movimentacoes_atual is not None and not df_movimentacoes_atual.empty:
             df_movimentacoes_atual.columns = [c.lower() for c in df_movimentacoes_atual.columns]
             self.df = df_movimentacoes_atual

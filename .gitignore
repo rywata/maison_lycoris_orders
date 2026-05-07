@@ -1,5 +1,4 @@
 # --- SEGURANÇA ---
-# Ignora as chaves locais do Google e configurações do Streamlit
 .streamlit/secrets.toml
 .streamlit/config.toml
 

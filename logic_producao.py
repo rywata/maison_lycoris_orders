@@ -32,6 +32,8 @@ class GerenciadorProducao:
             ).fillna(0)
 
     def calcular_insumos(self, nome_produto, quantidade):
+        if self.receitas.empty or 'Produto' not in self.receitas.columns:
+            return None
         mask = self.receitas['Produto'].str.upper() == nome_produto.upper()
         receita = self.receitas[mask]
         if receita.empty:
@@ -59,7 +61,7 @@ class GerenciadorProducao:
         linhas = []
         custo_total_producao = 0.0
 
-        for insumo in insumos:
+        for i, insumo in enumerate(insumos):
             custo_unit = calculador.custo_por_unidade(insumo['item']) if calculador else None
 
             if custo_unit is None:
@@ -67,7 +69,8 @@ class GerenciadorProducao:
 
             custo_total_producao += (custo_unit * insumo['qtd'])
 
-            linhas.append(self.gerenciador_mov.preparar_linha(
+            # Preparação da linha de SAÍDA
+            linha_insumo = self.gerenciador_mov.preparar_linha(
                 codigo="SAI-P",
                 item=insumo['item'],
                 qtd=insumo['qtd'],
@@ -76,11 +79,17 @@ class GerenciadorProducao:
                 custo_unitario=round(custo_unit, 4),
                 validade="",
                 lote=f"Pedido {id_pedido}"
-            ))
+            )
+            
+            # FORÇAR ID ÚNICO
+            linha_insumo['id_mov'] = f"{linha_insumo['id_mov']}_{i}"
+            
+            linhas.append(linha_insumo)
         
         custo_unitario_produto = custo_total_producao / quantidade if quantidade > 0 else 0.0
 
-        linhas.append(self.gerenciador_mov.preparar_linha(
+        # Preparação da linha de ENTRADA do produto acabado
+        linha_produto = self.gerenciador_mov.preparar_linha(
             codigo="ENT-P",
             item=nome_produto,
             qtd=quantidade,
@@ -89,7 +98,12 @@ class GerenciadorProducao:
             custo_unitario=round(float(custo_unitario_produto), 4),
             validade=validade_produto,  
             lote=f"Pedido {id_pedido}"
-        ))
+        )
+        
+        # ID da entrada único
+        linha_produto['id_mov'] = f"{linha_produto['id_mov']}_final"
+        
+        linhas.append(linha_produto)
 
         return linhas, None
 
