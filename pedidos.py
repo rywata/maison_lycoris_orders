@@ -32,8 +32,15 @@ def renderizar_novo_pedido():
             data_sel = st.date_input("Data de Entrega", value=datetime.now(fuso_brasil),
                                       format="DD/MM/YYYY")
         with col3:
-            horario_sel = st.time_input("Horário de Entrega",
-                                         value=datetime.now(fuso_brasil).replace(hour=9, minute=0, second=0).time())
+            if "horario_sel" not in st.session_state:       
+                st.session_state.horario_sel = datetime.now(fuso_brasil).replace(
+                    hour=9, minute=0, second=0
+                ).time()
+            horario_sel = st.time_input(
+                'Horário de Entrega',
+                value=st.session_state.horario_sel,
+                key='horario_sel'
+            )
 
     # --- ADICIONAR PRODUTOS ---
     st.divider()
@@ -169,7 +176,7 @@ def renderizar_novo_pedido():
                             "produto": ordem[3],
                             "quantidade": ordem[4],
                             "data_entrega": ordem[5],
-                            'horario_entrega': 'Horário', 
+                            'horario_entrega': horario_sel.strftime("%H:%M"), 
                             "status": ordem[6],
                         })
 
