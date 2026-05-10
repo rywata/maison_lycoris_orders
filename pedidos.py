@@ -115,30 +115,7 @@ def renderizar_novo_pedido():
                 dt_in = datetime.now(fuso_brasil).strftime("%Y-%m-%d %H:%M:%S")
                 db = Database()
 
-                # --- MONTA LINHAS DO PEDIDO ---
-                linhas_pedido = []
-                for _, row in df_editado.iterrows():
-                    tem_desc = meu_carrinho.tem_desconto and row['produto'] in codigo_pasteis
-                    desconto = float(row['qtd'] * row['preco_unitario'] * 0.15) if tem_desc else 0.0
-                    bruto = float(row['qtd'] * row['preco_unitario'])
-                    linhas_pedido.append({
-                        "id_pedido": id_p,
-                        "nome_cliente": nome_cliente,
-                        "data_entrega": data_sel.isoformat(),
-                        "horario_entrega": horario_sel.strftime("%H:%M"),
-                        "produto": row['produto'],
-                        "quantidade": int(row['qtd']),
-                        "total_bruto": bruto,
-                        "desconto": desconto,
-                        "total_liquido": bruto - desconto,
-                        "data_pedido": dt_in,
-                    })
-
-                if not db.salvar_pedido(linhas_pedido):
-                    st.error("Erro ao salvar pedido.")
-                    st.stop()
-
-                # --- DISPARA PRODUÇÃO ---
+                # --- DISPARA PRODUÇÃO E CÁLCULO DE CUSTOS ---
                 try:
                     df_receitas = db.receitas()
                     df_precos = db.precos()
@@ -149,20 +126,52 @@ def renderizar_novo_pedido():
 
                     todas_mov = []
                     todas_prod = []
+                    linhas_pedido = [] 
 
                     for _, row in df_editado.iterrows():
+                        # 1. Gera as movimentações (calcula o custo internamente)
                         linhas_mov, erro = produtor.gerar_movimentacoes(
                             id_pedido=id_p,
                             nome_produto=row['produto'].upper(),
                             quantidade=int(row['qtd']),
                             calculador=calc
                         )
+                        
+                        # 2. Captura o custo unitário da última linha (ENT-P)
+                        custo_unit_calc = 0.0
+                        if linhas_mov:
+                            custo_unit_calc = float(linhas_mov[-1]['custo_unitario'])
+                        
                         if erro:
                             st.warning(f"⚠️ {row['produto']}: {erro}. Estoque não movimentado.")
                             continue
 
                         todas_mov.extend(linhas_mov[:-1])
 
+                        # 3. Cálculos Financeiros para a tabela de Pedidos
+                        tem_desc = meu_carrinho.tem_desconto and row['produto'] in codigo_pasteis
+                        bruto = float(row['qtd'] * row['preco_unitario'])
+                        valor_desconto = bruto * 0.15 if tem_desc else 0.0
+                        
+                        faturamento_real = bruto - valor_desconto
+                        custo_total_linha = custo_unit_calc * int(row['qtd'])
+
+                        # 4. Monta a linha do pedido com o Lucro Líquido (Faturamento - Custo)
+                        linhas_pedido.append({
+                            "id_pedido": id_p,
+                            "nome_cliente": nome_cliente,
+                            "data_entrega": data_sel.isoformat(),
+                            "horario_entrega": horario_sel.strftime("%H:%M"),
+                            "produto": row['produto'],
+                            "quantidade": int(row['qtd']),
+                            "total_bruto": bruto,
+                            "desconto": valor_desconto,
+                            "total_liquido": faturamento_real - custo_total_linha, 
+                            "custo_total": custo_total_linha,
+                            "data_pedido": dt_in,
+                        })
+
+                        # 5. Gera a Ordem de Produção
                         ordem = produtor.gerar_ordem_producao(
                             id_pedido=id_p,
                             nome_produto=row['produto'],
@@ -180,17 +189,22 @@ def renderizar_novo_pedido():
                             "status": ordem[6],
                         })
 
+                    # --- SALVAMENTO EM LOTE ---
+                    if not db.salvar_pedido(linhas_pedido):
+                        st.error("Erro ao salvar pedido.")
+                        st.stop()
+                        
                     if todas_mov:
                         db.salvar_movimentacoes_lote(todas_mov)
                     if todas_prod:
                         db.salvar_ordens_lote(todas_prod)
 
                 except Exception as e:
-                    st.warning(f"Pedido salvo, mas erro ao gerar produção: {e}")
+                    st.warning(f"Erro ao processar pedido e produção: {e}")
 
                 st.session_state.carrinho = []
                 st.session_state.pop("input_nome_cliente", None)
-                st.success("✅ Pedido enviado! Produção aguardando confirmação.")
+                st.success("✅ Pedido enviado! Lucro e custos registrados.")
                 import time
                 time.sleep(2)
                 st.rerun()
