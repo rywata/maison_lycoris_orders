@@ -40,6 +40,27 @@ class Database:
             st.error(f"Erro ao inserir lote em {tabela}: {e}")
             return False
 
+    def inserir_retornando(self, tabela, dados):      # <- novo
+        """UUID"""
+        try:
+            response = self.sb.table(tabela).insert(dados).execute()
+            if response.data:
+                return response.data[0]
+            return None
+        except Exception as e:
+            st.error(f"Erro ao inserir em {tabela}: {e}")
+            return None
+
+    def inserir_lote_retornando(self, tabela, lista):  # <- novo
+        """Insere lote e retorna todos os registros criados."""
+        try:
+            response = self.sb.table(tabela).insert(lista).execute()
+            return response.data or []
+        except Exception as e:
+            st.error(f"Erro ao inserir lote em {tabela}: {e}")
+            return []
+
+
     def atualizar(self, tabela, filtros, dados):
         try:
             query = self.sb.table(tabela).update(dados)

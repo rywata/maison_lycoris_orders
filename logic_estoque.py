@@ -13,33 +13,11 @@ class GerenciadorMovimentacao:
         else:
             self.df = pd.DataFrame()
 
-    def gerar_id_unico(self, codigo_operacao):
-        """Gera ID baseado em prefixo (1-Entrada, 2-Saída), Data e Sequencial."""
-        prefixo = "1" if codigo_operacao.startswith("ENT") else "2"
-        hoje_str = datetime.now(fuso_brasil).strftime("%Y%m%d")
-
-        # Busca IDs gerados hoje no DataFrame atual para definir o próximo sequencial
-        if not self.df.empty and 'id_mov' in self.df.columns:
-            ids_hoje = self.df[self.df['id_mov'].astype(str).str.contains(hoje_str)]
-            proximo_sequencial = len(ids_hoje) + 1
-        else:
-            proximo_sequencial = 1
-
-        return f"{prefixo}{hoje_str}{proximo_sequencial:05d}"
-
     def preparar_linha(self, codigo, item, qtd, unidade_medida, unidade_compra="", custo_unitario=0.0, validade="", lote=""):
-        """Prepara os dados para inserção no banco de dados SQL."""
-        id_mov = self.gerar_id_unico(codigo)
-        
-        # Lógica de sinal: Saídas ficam negativas no estoque
         qtd_final = -abs(qtd) if codigo.startswith("SAI") else abs(qtd)
-        
-        # Cálculo do Custo Total
         custo_total = abs(qtd) * custo_unitario
 
-        # Retorna dicionário pronto para o Supabase (sb.table().insert())
         return {
-            "id_mov": id_mov,
             "data_mov": datetime.now(fuso_brasil).isoformat(),
             "tipo": codigo,
             "item": item,

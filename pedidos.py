@@ -132,7 +132,7 @@ def renderizar_novo_pedido():
 
                     for _, row in df_editado.iterrows():
                         linhas_mov, erro = produtor.gerar_movimentacoes(
-                            id_pedido=id_p,
+                            id_pedido="pendente",
                             nome_produto=row['produto'].upper(),
                             quantidade=int(row['qtd']),
                             calculador=calc
@@ -155,7 +155,6 @@ def renderizar_novo_pedido():
                         custo_total_linha = custo_unit_calc * int(row['qtd'])
 
                         linhas_pedido.append({
-                            "id_pedido": id_p,
                             "nome_cliente": nome_cliente,
                             "data_entrega": data_sel.isoformat(),
                             "horario_entrega": horario_sel.strftime("%H:%M"),
@@ -167,28 +166,34 @@ def renderizar_novo_pedido():
                             "custo_total": custo_total_linha, 
                             "data_pedido": dt_in,
                         })
+                        
+                        for i, (_, row) in enumerate(df_editado.iterrows()):
+                            if i >= len(pedidos_criados):
+                                break
+                            id_pedido_real = pedidos_criados[i]['id_pedido']
 
-                        ordem = produtor.gerar_ordem_producao(
-                            id_pedido=id_p, 
-                            nome_produto=row['produto'],
-                            quantidade=int(row['qtd']),
-                            data_entrega=data_sel.isoformat()
-                        )
-                        todas_prod.append({
-                            "id_producao": ordem[0], 
-                            "id_pedido": ordem[1],   
-                            "data_producao": ordem[2],
-                            "produto": ordem[3],
-                            "quantidade": ordem[4],
-                            "data_entrega": ordem[5],
-                            'horario_entrega': horario_sel.strftime("%H:%M"), 
-                            "status": ordem[6],
-                        })
+                            # Atualiza o lote das movimentações com o ID real
+                            for mov in todas_mov:
+                                if mov.get('lote') == "pendente":
+                                    mov['lote'] = f"Pedido {id_pedido_real}"
 
-                    # Salvamento em Lote
-                    if not db.salvar_pedido(linhas_pedido):
-                        st.error("Erro ao salvar pedido.")
-                        st.stop()
+                            ordem = produtor.gerar_ordem_producao(
+                                id_pedido=id_p, 
+                                nome_produto=row['produto'],
+                                quantidade=int(row['qtd']),
+                                data_entrega=data_sel.isoformat()
+                            )
+                            todas_prod.append({
+                                "id_pedido": id_pedido_real,   
+                                "data_producao": ordem[1],
+                                "produto": ordem[2],
+                                "quantidade": ordem[3],
+                                "data_entrega": ordem[4],
+                                'horario_entrega': horario_sel.strftime("%H:%M"), 
+                                "status": ordem[5],
+                            })
+
+
                         
                     if todas_mov:
                         db.salvar_movimentacoes_lote(todas_mov)
@@ -197,3 +202,10 @@ def renderizar_novo_pedido():
 
                 except Exception as e:
                     st.warning(f"Erro ao processar pedido e produção: {e}")
+
+                st.session_state.carrinho = []
+                st.session_state.pop("input_nome_cliente", None)
+                st.success("✅ Pedido enviado! Produção aguardando confirmação.")
+                import time
+                time.sleep(2)
+                st.rerun()

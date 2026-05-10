@@ -108,11 +108,7 @@ class GerenciadorProducao:
         return linhas, None
 
     def gerar_ordem_producao(self, id_pedido, nome_produto, quantidade, data_entrega):
-        data_slug = datetime.now(fuso_brasil).strftime("%Y%m")
-        ts = datetime.now(fuso_brasil).strftime("%H%M%S")
-        id_prod = f"ORD-{data_slug}-{ts}" 
         return [
-            id_prod,
             id_pedido,
             datetime.now(fuso_brasil).strftime("%Y-%m-%d %H:%M:%S"),
             nome_produto,
