@@ -111,6 +111,10 @@ def renderizar_novo_pedido():
 
         with col_enviar:
             if st.button("🚀 FINALIZAR E ENVIAR", type="primary", use_container_width=True):
+                data_slug = datetime.now(fuso_brasil).strftime("%Y%m")
+                ts_pedido = datetime.now(fuso_brasil).strftime("%H%M%S")
+                id_p_smart = f"PED-{data_slug}-{ts_pedido}"
+
                 dt_in = datetime.now(fuso_brasil).strftime("%Y-%m-%d %H:%M:%S")
                 db = Database()
 
@@ -122,30 +126,33 @@ def renderizar_novo_pedido():
                     calc = CalculadorCustos(df_precos)
                     produtor = GerenciadorProducao(df_receitas, df_mov)
 
-                    # --- LOOP 1: monta linhas do pedido e movimentações ---
                     linhas_pedido = []
-                    movs_por_produto = []  
+                    todas_mov = []
+                    todas_prod = []
 
                     for _, row in df_editado.iterrows():
                         linhas_mov, erro = produtor.gerar_movimentacoes(
-                            id_pedido="pendente",
+                            id_pedido=id_p_smart,
                             nome_produto=row['produto'].upper(),
                             quantidade=int(row['qtd']),
                             calculador=calc
                         )
+                        
                         if erro:
                             st.warning(f"⚠️ {row['produto']}: {erro}.")
-                            movs_por_produto.append([])
                             continue
 
-                        movs_por_produto.append(linhas_mov)
+                        # Acumula as movimentações (insumos + entrada do produto)
+                        todas_mov.extend(linhas_mov)
 
+                        # Captura custos e prepara a linha do pedido
+                        custo_unit_calc = float(linhas_mov[-1]['custo_unitario']) if linhas_mov else 0.0
                         tem_desc = meu_carrinho.tem_desconto and row['produto'] in codigo_pasteis
                         bruto = float(row['qtd'] * row['preco_unitario'])
                         valor_desconto = bruto * 0.15 if tem_desc else 0.0
-                        custo_unit_calc = float(linhas_mov[-1]['custo_unitario']) if linhas_mov else 0.0
 
                         linhas_pedido.append({
+                            "id_pedido": id_p_smart, 
                             "nome_cliente": nome_cliente,
                             "data_entrega": data_sel.isoformat(),
                             "horario_entrega": horario_sel.strftime("%H:%M"),
@@ -158,53 +165,40 @@ def renderizar_novo_pedido():
                             "data_pedido": dt_in,
                         })
 
-                    # --- SALVA PEDIDOS e captura UUIDs gerados ---
-                    pedidos_criados = db.inserir_lote_retornando("pedidos", linhas_pedido)
-                    if not pedidos_criados:
-                        st.error("Erro ao salvar pedido.")
-                        st.stop()
-
-                    # --- LOOP 2: monta ordens e movimentações com UUID real ---
-                    todas_mov = []
-                    todas_prod = []
-
-                    for i, pedido in enumerate(pedidos_criados):
-                        id_pedido_real = pedido['id_pedido']
-                        row = df_editado.iloc[i]
-
-                        for mov in movs_por_produto[i]:
-                            mov['lote'] = f"Pedido {id_pedido_real}"
-                        todas_mov.extend(movs_por_produto[i])
-
-                        # Cria ordem de produção
+                        # Ordem de produção vinculada ao Smart ID
                         ordem = produtor.gerar_ordem_producao(
-                            id_pedido=id_pedido_real,
+                            id_pedido=id_p_smart,
                             nome_produto=row['produto'],
                             quantidade=int(row['qtd']),
                             data_entrega=data_sel.isoformat()
                         )
                         todas_prod.append({
-                            "id_pedido": id_pedido_real,
-                            "data_producao": ordem[1],
-                            "produto": ordem[2],
-                            "quantidade": ordem[3],
-                            "data_entrega": ordem[4],
+                            "id_producao": ordem[0],
+                            "id_pedido": id_p_smart,
+                            "data_producao": ordem[2],
+                            "produto": ordem[3],
+                            "quantidade": ordem[4],
+                            "data_entrega": ordem[5],
                             "horario_entrega": horario_sel.strftime("%H:%M"),
-                            "status": ordem[5],
+                            "status": "Pendente",
                         })
 
+                    # SALVAMENTO EM LOTE
+                    if linhas_pedido:
+                        db.inserir_lote("pedidos", linhas_pedido)
                     if todas_mov:
                         db.salvar_movimentacoes_lote(todas_mov)
                     if todas_prod:
                         db.salvar_ordens_lote(todas_prod)
 
                 except Exception as e:
-                    st.warning(f"Erro ao processar pedido: {e}")
+                    st.error(f"Erro ao processar: {e}")
                     st.stop()
 
+                # Limpeza e Feedback
                 st.session_state.carrinho = []
                 st.session_state.pop("input_nome_cliente", None)
-                st.success("✅ Pedido enviado! Produção aguardando confirmação.")
+                st.success(f"✅ Pedido {id_p_smart} enviado!")
                 import time
                 time.sleep(2)
                 st.rerun()
