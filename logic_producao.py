@@ -56,7 +56,7 @@ class GerenciadorProducao:
             return None, f"Receita não encontrada para '{nome_produto}'"
 
         # Validade = hoje + 4 dias
-        validade_produto = (datetime.now(fuso_brasil) + timedelta(days=4)).strftime("%d/%m/%Y")
+        validade_produto = (datetime.now(fuso_brasil) + timedelta(days=4)).strftime("%Y/%m/%d")
 
         linhas = []
         custo_total_producao = 0.0
@@ -138,7 +138,7 @@ class GerenciadorStatusProducao:
                 _, custo_total = self.calculador.calcular_custo_receita(insumos)
                 custo_unitario_produto = custo_total / quantidade if quantidade > 0 else 0.0
 
-        validade_produto = (datetime.now(fuso_brasil) + timedelta(days=4)).strftime("%d/%m/%Y")
+        validade_produto = (datetime.now(fuso_brasil) + timedelta(days=4)).strftime("%Y/%m/%d")
 
         linha_mov = self.gerenciador_mov.preparar_linha(
             codigo="ENT-P",
