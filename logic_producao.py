@@ -78,11 +78,11 @@ class GerenciadorProducao:
                 unidade_compra="",
                 custo_unitario=round(custo_unit, 4),
                 validade="",
-                lote=f"Pedido {id_pedido}"
+                lote=id_pedido
             )
             
             # FORÇAR ID ÚNICO
-            linha_insumo['id_mov'] = f"{linha_insumo['id_mov']}_{i}"
+            # linha_insumo['id_mov'] = f"{linha_insumo['id_mov']}_{i}"
             
             linhas.append(linha_insumo)
         
@@ -97,7 +97,7 @@ class GerenciadorProducao:
             unidade_compra="",
             custo_unitario=round(float(custo_unitario_produto), 4),
             validade=validade_produto,  
-            lote=f"Pedido {id_pedido}"
+            lote=id_pedido
         )
         
         # ID da entrada único
@@ -108,7 +108,9 @@ class GerenciadorProducao:
         return linhas, None
 
     def gerar_ordem_producao(self, id_pedido, nome_produto, quantidade, data_entrega):
-        id_prod = f"PROD{datetime.now(fuso_brasil).strftime('%Y%m%d%H%M%S')}"
+        data_slug = datetime.now(fuso_brasil).strftime("%Y%m")
+        ts = datetime.now(fuso_brasil).strftime("%H%M%S")
+        id_prod = f"ORD-{data_slug}-{ts}" 
         return [
             id_prod,
             id_pedido,
