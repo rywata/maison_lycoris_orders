@@ -32,7 +32,7 @@ def renderizar_novo_pedido():
             data_sel = st.date_input("Data de Entrega", value=datetime.now(fuso_brasil),
                                       format="DD/MM/YYYY")
         with col3:
-            if "horario_sel" not in st.session_state:       
+            if "horario_sel" not in st.session_state:
                 st.session_state.horario_sel = datetime.now(fuso_brasil).replace(
                     hour=9, minute=0, second=0
                 ).time()
@@ -111,10 +111,6 @@ def renderizar_novo_pedido():
 
         with col_enviar:
             if st.button("🚀 FINALIZAR E ENVIAR", type="primary", use_container_width=True):
-                data_slug = datetime.now(fuso_brasil).strftime("%Y%m")
-                ts = datetime.now(fuso_brasil).strftime("%H%M%S")
-                id_p = f"PED-{data_slug}-{ts}" 
-                
                 dt_in = datetime.now(fuso_brasil).strftime("%Y-%m-%d %H:%M:%S")
                 db = Database()
 
@@ -126,9 +122,9 @@ def renderizar_novo_pedido():
                     calc = CalculadorCustos(df_precos)
                     produtor = GerenciadorProducao(df_receitas, df_mov)
 
-                    todas_mov = []
-                    todas_prod = []
-                    linhas_pedido = [] 
+                    # --- LOOP 1: monta linhas do pedido e movimentações ---
+                    linhas_pedido = []
+                    movs_por_produto = []  
 
                     for _, row in df_editado.iterrows():
                         linhas_mov, erro = produtor.gerar_movimentacoes(
@@ -137,22 +133,17 @@ def renderizar_novo_pedido():
                             quantidade=int(row['qtd']),
                             calculador=calc
                         )
-                        
                         if erro:
-                            st.warning(f"⚠️ {row['produto']}: {erro}. Estoque não movimentado.")
+                            st.warning(f"⚠️ {row['produto']}: {erro}.")
+                            movs_por_produto.append([])
                             continue
 
-                        # Captura o custo unitário da linha de entrada (ENT-P)
-                        custo_unit_calc = float(linhas_mov[-1]['custo_unitario']) if linhas_mov else 0.0
-                        todas_mov.extend(linhas_mov) 
+                        movs_por_produto.append(linhas_mov)
 
-                        # Cálculos Financeiros
                         tem_desc = meu_carrinho.tem_desconto and row['produto'] in codigo_pasteis
                         bruto = float(row['qtd'] * row['preco_unitario'])
                         valor_desconto = bruto * 0.15 if tem_desc else 0.0
-                        
-                        faturamento_liquido = bruto - valor_desconto
-                        custo_total_linha = custo_unit_calc * int(row['qtd'])
+                        custo_unit_calc = float(linhas_mov[-1]['custo_unitario']) if linhas_mov else 0.0
 
                         linhas_pedido.append({
                             "nome_cliente": nome_cliente,
@@ -162,46 +153,54 @@ def renderizar_novo_pedido():
                             "quantidade": int(row['qtd']),
                             "total_bruto": bruto,
                             "desconto": valor_desconto,
-                            "total_liquido": faturamento_liquido, 
-                            "custo_total": custo_total_linha, 
+                            "total_liquido": bruto - valor_desconto,
+                            "custo_total": custo_unit_calc * int(row['qtd']),
                             "data_pedido": dt_in,
                         })
-                        
-                        for i, (_, row) in enumerate(df_editado.iterrows()):
-                            if i >= len(pedidos_criados):
-                                break
-                            id_pedido_real = pedidos_criados[i]['id_pedido']
 
-                            # Atualiza o lote das movimentações com o ID real
-                            for mov in todas_mov:
-                                if mov.get('lote') == "pendente":
-                                    mov['lote'] = f"Pedido {id_pedido_real}"
+                    # --- SALVA PEDIDOS e captura UUIDs gerados ---
+                    pedidos_criados = db.inserir_lote_retornando("pedidos", linhas_pedido)
+                    if not pedidos_criados:
+                        st.error("Erro ao salvar pedido.")
+                        st.stop()
 
-                            ordem = produtor.gerar_ordem_producao(
-                                id_pedido=id_p, 
-                                nome_produto=row['produto'],
-                                quantidade=int(row['qtd']),
-                                data_entrega=data_sel.isoformat()
-                            )
-                            todas_prod.append({
-                                "id_pedido": id_pedido_real,   
-                                "data_producao": ordem[1],
-                                "produto": ordem[2],
-                                "quantidade": ordem[3],
-                                "data_entrega": ordem[4],
-                                'horario_entrega': horario_sel.strftime("%H:%M"), 
-                                "status": ordem[5],
-                            })
+                    # --- LOOP 2: monta ordens e movimentações com UUID real ---
+                    todas_mov = []
+                    todas_prod = []
 
+                    for i, pedido in enumerate(pedidos_criados):
+                        id_pedido_real = pedido['id_pedido']
+                        row = df_editado.iloc[i]
 
-                        
+                        for mov in movs_por_produto[i]:
+                            mov['lote'] = f"Pedido {id_pedido_real}"
+                        todas_mov.extend(movs_por_produto[i])
+
+                        # Cria ordem de produção
+                        ordem = produtor.gerar_ordem_producao(
+                            id_pedido=id_pedido_real,
+                            nome_produto=row['produto'],
+                            quantidade=int(row['qtd']),
+                            data_entrega=data_sel.isoformat()
+                        )
+                        todas_prod.append({
+                            "id_pedido": id_pedido_real,
+                            "data_producao": ordem[1],
+                            "produto": ordem[2],
+                            "quantidade": ordem[3],
+                            "data_entrega": ordem[4],
+                            "horario_entrega": horario_sel.strftime("%H:%M"),
+                            "status": ordem[5],
+                        })
+
                     if todas_mov:
                         db.salvar_movimentacoes_lote(todas_mov)
                     if todas_prod:
                         db.salvar_ordens_lote(todas_prod)
 
                 except Exception as e:
-                    st.warning(f"Erro ao processar pedido e produção: {e}")
+                    st.warning(f"Erro ao processar pedido: {e}")
+                    st.stop()
 
                 st.session_state.carrinho = []
                 st.session_state.pop("input_nome_cliente", None)
