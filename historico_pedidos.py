@@ -108,6 +108,7 @@ def renderizar_historico():
         'quantidade': 'Qtd',
         'total_bruto': 'Total Bruto',
         'custo_total': 'Curto Total',
+        'desconto': 'Desconto',
         'total_liquido': 'Total Líquido'
     }
 
