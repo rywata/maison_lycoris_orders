@@ -165,7 +165,6 @@ def renderizar_novo_pedido():
                             "data_pedido": dt_in,
                         })
 
-                        # Ordem de produção vinculada ao Smart ID
                         ordem = produtor.gerar_ordem_producao(
                             id_pedido=id_p_smart,
                             nome_produto=row['produto'],
@@ -173,14 +172,13 @@ def renderizar_novo_pedido():
                             data_entrega=data_sel.isoformat()
                         )
                         todas_prod.append({
-                            "id_producao": ordem[0],
-                            "id_pedido": id_p_smart,
-                            "data_producao": ordem[2],
-                            "produto": ordem[3],
-                            "quantidade": ordem[4],
-                            "data_entrega": ordem[5],
+                            "id_pedido": ordem[0],
+                            "data_producao": ordem[1],
+                            "produto": ordem[2],
+                            "quantidade": ordem[3],
+                            "data_entrega": ordem[4],
                             "horario_entrega": horario_sel.strftime("%H:%M"),
-                            "status": "Pendente",
+                            "status": ordem[5],
                         })
 
                     # SALVAMENTO EM LOTE

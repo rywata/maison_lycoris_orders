@@ -6,14 +6,14 @@ fuso_brasil = pytz.timezone('America/Sao_Paulo')
 
 class GerenciadorMovimentacao:
     def __init__(self, df_movimentacoes_atual=None):
-
         if df_movimentacoes_atual is not None and not df_movimentacoes_atual.empty:
             df_movimentacoes_atual.columns = [c.lower() for c in df_movimentacoes_atual.columns]
             self.df = df_movimentacoes_atual
         else:
             self.df = pd.DataFrame()
 
-    def preparar_linha(self, codigo, item, qtd, unidade_medida, unidade_compra="", custo_unitario=0.0, validade="", lote=""):
+    def preparar_linha(self, codigo, item, qtd, unidade_medida, unidade_compra="",
+                       custo_unitario=0.0, validade="", lote=""):
         qtd_final = -abs(qtd) if codigo.startswith("SAI") else abs(qtd)
         custo_total = abs(qtd) * custo_unitario
 

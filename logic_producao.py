@@ -56,21 +56,19 @@ class GerenciadorProducao:
             return None, f"Receita não encontrada para '{nome_produto}'"
 
         # Validade = hoje + 4 dias
-        validade_produto = (datetime.now(fuso_brasil) + timedelta(days=4)).strftime("%Y/%m/%d")
+        validade_produto = (datetime.now(fuso_brasil) + timedelta(days=4)).strftime("%Y-%m-%d")
+
 
         linhas = []
         custo_total_producao = 0.0
 
-        for i, insumo in enumerate(insumos):
-            custo_unit = calculador.custo_por_unidade(insumo['item']) if calculador else None
-
+        for insumo in insumos:
+            custo_unit = calculador.custo_por_unidade(insumo['item']) if calculador else 0.0
             if custo_unit is None:
                 custo_unit = 0.0
+            custo_total_producao += custo_unit * insumo['qtd']
 
-            custo_total_producao += (custo_unit * insumo['qtd'])
-
-            # Preparação da linha de SAÍDA
-            linha_insumo = self.gerenciador_mov.preparar_linha(
+            linhas.append(self.gerenciador_mov.preparar_linha(
                 codigo="SAI-P",
                 item=insumo['item'],
                 qtd=insumo['qtd'],
@@ -78,46 +76,32 @@ class GerenciadorProducao:
                 unidade_compra="",
                 custo_unitario=round(custo_unit, 4),
                 validade="",
-                lote=id_pedido
-            )
-            
-            # FORÇAR ID ÚNICO
-            # linha_insumo['id_mov'] = f"{linha_insumo['id_mov']}_{i}"
-            
-            linhas.append(linha_insumo)
-        
+                lote=str(id_pedido)
+            ))
+
         custo_unitario_produto = custo_total_producao / quantidade if quantidade > 0 else 0.0
 
-        # Preparação da linha de ENTRADA do produto acabado
-        linha_produto = self.gerenciador_mov.preparar_linha(
+        linhas.append(self.gerenciador_mov.preparar_linha(
             codigo="ENT-P",
             item=nome_produto,
             qtd=quantidade,
             unidade_medida="un",
             unidade_compra="",
             custo_unitario=round(float(custo_unitario_produto), 4),
-            validade=validade_produto,  
-            lote=id_pedido
-        )
-        
-        # ID da entrada único
-        linha_produto['id_mov'] = f"{linha_produto['id_mov']}_final"
-        
-        linhas.append(linha_produto)
+            validade=validade_produto,
+            lote=str(id_pedido)
+        ))
 
         return linhas, None
 
     def gerar_ordem_producao(self, id_pedido, nome_produto, quantidade, data_entrega):
-        ts = datetime.now(fuso_brasil).strftime('%Y%m%d%H%M%S%f')
-        id_prod = f"ORD-{ts[:16]}"
         return [
-            id_prod,
-            id_pedido,
-            datetime.now(fuso_brasil).strftime("%Y-%m-%d %H:%M:%S"),
-            nome_produto,
-            quantidade,
-            data_entrega,
-            "Pendente"
+            id_pedido,                                                # [0]
+            datetime.now(fuso_brasil).strftime("%Y-%m-%d %H:%M:%S"), # [1]
+            nome_produto,                                             # [2]
+            quantidade,                                               # [3]
+            data_entrega,                                             # [4]
+            "Pendente"                                                # [5]
         ]
 
 class GerenciadorStatusProducao:
@@ -139,7 +123,8 @@ class GerenciadorStatusProducao:
                 _, custo_total = self.calculador.calcular_custo_receita(insumos)
                 custo_unitario_produto = custo_total / quantidade if quantidade > 0 else 0.0
 
-        validade_produto = (datetime.now(fuso_brasil) + timedelta(days=4)).strftime("%Y/%m/%d")
+        validade_produto = (datetime.now(fuso_brasil) + timedelta(days=4)).strftime("%Y-%m-%d")
+
 
         linha_mov = self.gerenciador_mov.preparar_linha(
             codigo="ENT-P",

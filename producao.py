@@ -185,14 +185,14 @@ def renderizar_producao():
                                 data_final.isoformat()
                             )
                             db.salvar_ordem_producao({
-                                "id_producao": ordem[0],
-                                "id_pedido": ordem[1],
-                                "data_producao": ordem[2],
-                                "produto": ordem[3],
-                                "quantidade": ordem[4],
-                                "data_entrega": ordem[5],
+                                "id_pedido": ordem[0],
+                                "data_producao": ordem[1],
+                                "produto": ordem[2],
+                                "quantidade": ordem[3],
+                                "data_entrega": ordem[4],
                                 "status": "Concluído",
                             })
+                            
                             st.success(f"Produção registrada!")
                             st.session_state.mostrar_form_producao = False
                             st.cache_data.clear()
