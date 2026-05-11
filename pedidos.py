@@ -152,7 +152,6 @@ def renderizar_novo_pedido():
                         valor_desconto = bruto * 0.15 if tem_desc else 0.0
 
                         linhas_pedido.append({
-                            "id_pedido": id_p_smart, 
                             "nome_cliente": nome_cliente,
                             "data_entrega": data_sel.isoformat(),
                             "horario_entrega": horario_sel.strftime("%H:%M"),

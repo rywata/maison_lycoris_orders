@@ -236,7 +236,6 @@ def renderizar_estoque():
                 qtd_sinal = -abs(qtd_final) if codigo.startswith("SAI") else abs(qtd_final)
 
                 linha = {
-                    "id_mov": f"{'1' if codigo.startswith('ENT') else '2'}{now.strftime('%Y%m%d%H%M%S')}",
                     "data_mov": now.strftime("%Y-%m-%d %H:%M:%S"),
                     "tipo": codigo,
                     "item": item,
