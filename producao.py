@@ -77,7 +77,7 @@ def renderizar_producao():
 
                     with c1:
                         st.markdown(f"**{row['produto']}**")
-                        st.caption(f"Pedido `{row['id_pedido']}`")
+                        st.caption(f"Pedido `{row['id_origem']}`")
                         custo = row.get('custo_estimado', 0) or 0
                         st.caption(f"Custo estimado: R$ {custo:.2f}")
 
