@@ -186,11 +186,13 @@ def renderizar_producao():
                             )
                             db.salvar_ordem_producao({
                                 "id_pedido": ordem[0],
+                                "id_origem": id_ref_final,
                                 "data_producao": ordem[1],
                                 "produto": ordem[2],
                                 "quantidade": ordem[3],
                                 "data_entrega": ordem[4],
                                 "status": "Concluído",
+                                "custo_total": total
                             })
                             
                             st.success(f"Produção registrada!")
