@@ -77,7 +77,12 @@ def renderizar_producao():
 
                     with c1:
                         st.markdown(f"**{row['produto']}**")
-                        st.caption(f"Pedido `{row['id_origem']}`")
+                        id_exibicao = row.get('id_origem')
+                        if pd.isna(id_exibicao) or id_exibicao is None:
+                            id_exibicao = f"Ref: {str(row.get('id_pedido', 'S/ Ref'))[:8]}"
+                        
+                        st.caption(f"Pedido `{id_exibicao}`")
+                        
                         custo = row.get('custo_estimado', 0) or 0
                         st.caption(f"Custo estimado: R$ {custo:.2f}")
 

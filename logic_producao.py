@@ -126,6 +126,7 @@ class GerenciadorStatusProducao:
         validade_produto = (datetime.now(fuso_brasil) + timedelta(days=4)).strftime("%Y-%m-%d")
 
 
+
         linha_mov = self.gerenciador_mov.preparar_linha(
             codigo="ENT-P",
             item=nome_produto,

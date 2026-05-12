@@ -180,22 +180,20 @@ def renderizar_novo_pedido():
                     todas_ordens_producao = []
 
                     for i, pedido_db in enumerate(pedidos_confirmados):
-                        uuid_tecnico = pedido_db['id_pedido'] 
-                        
-                        # Atualiza as movimentações de estoque com o UUID técnico
+                        uuid_tecnico = pedido_db['id_pedido']
+
                         for mov in estoque_temporario[i]:
-                            mov['id_pedido'] = uuid_tecnico
-                            mov['lote'] = id_origem_smart 
+                            mov['lote'] = id_origem_smart
                         todas_movimentacoes_finais.extend(estoque_temporario[i])
 
                         todas_ordens_producao.append({
-                            "id_pedido": uuid_tecnico,      # Chave Estrangeira (Vínculo técnico)
-                            "id_origem": id_origem_smart,   # Chave de Origem (Vínculo visual/Barcode)
-                            "data_producao": data_sel.isoformat(),
+                            "id_pedido": uuid_tecnico,
+                            "id_origem": id_origem_smart,
+                            "data_producao": datetime.now(fuso_brasil).strftime("%Y-%m-%d %H:%M:%S"),
                             "produto": pedido_db['produto'],
                             "quantidade": pedido_db['quantidade'],
                             "data_entrega": pedido_db['data_entrega'],
-                            "horario_entrega": pedido_db['horario_entrega'],
+                            "horario_entrega": pedido_db.get('horario_entrega', ''),
                             "status": "Pendente"
                         })
 
