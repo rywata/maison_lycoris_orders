@@ -244,6 +244,7 @@ def renderizar_estoque():
                     "unidade_compra": un_compra_final,
                     "validade": validade_final,
                     "lote": lote_final,
+                    "id_origem": lote_final if lote_final else None,
                     "custo_unitario": round(float(custo_final), 6),
                     "custo_total": round(abs(qtd_final) * custo_final, 4),
                 }

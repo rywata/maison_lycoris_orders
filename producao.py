@@ -249,6 +249,8 @@ def _confirmar_producao(row, df_movimentacoes, df_receitas):
             data_entrega=row.get('data_entrega', '')
         )
 
+        linha_mov['id_origem'] = str(row.get('id_origem', row.get('id_producao', '')))
+
         # Salva ENT-P no estoque
         ok_mov = db.salvar_movimentacao(linha_mov)
         if not ok_mov:
