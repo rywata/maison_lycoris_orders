@@ -111,31 +111,49 @@ def renderizar_novo_pedido():
 
         with col_enviar:
             if st.button("🚀 FINALIZAR E ENVIAR", type="primary", use_container_width=True):
-                # 1. CÓDIGO PARA O CÓDIGO DE BARRAS (id_origem)
+                
+                # --- ETAPA 1: GERAÇÃO DO IDENTIFICADOR DE NEGÓCIO (SMART ID) ---
+                # ID que será usado no Código de Barras.
                 data_slug = datetime.now(fuso_brasil).strftime("%Y%m")
                 ts_pedido = datetime.now(fuso_brasil).strftime("%H%M%S")
-                id_p_smart = f"PED-{data_slug}-{ts_pedido}"
+                id_origem_smart = f"PED-{data_slug}-{ts_pedido}"
 
-                dt_in = datetime.now(fuso_brasil).strftime("%Y-%m-%d %H:%M:%S")
                 db = Database()
 
                 try:
+                    # --- ETAPA 2: PREPARAÇÃO DOS DADOS E MOTORES DE CÁLCULO ---
+                    # Carregamos as tabelas necessárias para calcular custos e receitas.
                     df_receitas = db.receitas()
                     df_precos = db.precos()
                     df_mov = db.movimentacoes()
-
+                    
                     calc = CalculadorCustos(df_precos)
                     produtor = GerenciadorProducao(df_receitas, df_mov)
 
-                    # --- ETAPA 1: SALVAR O PEDIDO PARA OBTER O UUID ---
-                    pre_linhas_pedido = []
+                    linhas_pedido_para_banco = []
+                    estoque_temporario = [] 
+
+                    # --- ETAPA 3: LOOP DE PROCESSAMENTO E CÁLCULO DE CUSTOS ---
                     for _, row in df_editado.iterrows():
+                        linhas_mov, erro = produtor.gerar_movimentacoes(
+                            id_pedido=id_origem_smart, 
+                            nome_produto=row['produto'].upper(),
+                            quantidade=int(row['qtd']),
+                            calculador=calc
+                        )
+                        
+                        # Extração do custo total da linha
+                        custo_unit_calc = float(linhas_mov[-1]['custo_unitario']) if not erro and linhas_mov else 0.0
+                        custo_total_item = custo_unit_calc * int(row['qtd'])
+
+                        # Cálculos de preço e descontos (Combo Maison Lycoris)
                         tem_desc = meu_carrinho.tem_desconto and row['produto'] in codigo_pasteis
                         bruto = float(row['qtd'] * row['preco_unitario'])
                         valor_desconto = bruto * 0.15 if tem_desc else 0.0
 
-                        pre_linhas_pedido.append({
-                            "id_origem": id_p_smart, 
+                        # Montagem do dicionário que irá para a tabela 'pedidos'
+                        linhas_pedido_para_banco.append({
+                            "id_origem": id_origem_smart,     # Chave de Negócio (Barcode)
                             "nome_cliente": nome_cliente,
                             "data_entrega": data_sel.isoformat(),
                             "horario_entrega": horario_sel.strftime("%H:%M"),
@@ -144,66 +162,58 @@ def renderizar_novo_pedido():
                             "total_bruto": bruto,
                             "desconto": valor_desconto,
                             "total_liquido": bruto - valor_desconto,
-                            "data_pedido": dt_in,
+                            "custo_total": custo_total_item,
+                            "data_pedido": datetime.now(fuso_brasil).strftime("%Y-%m-%d %H:%M:%S")
                         })
+                        
+                        estoque_temporario.append(linhas_mov)
 
-                    pedidos_confirmados = db.inserir_lote_retornando("pedidos", pre_linhas_pedido)
-                    
+                    # --- ETAPA 4: PERSISTÊNCIA DO PEDIDO E CAPTURA DE UUIDs ---
+                    pedidos_confirmados = db.inserir_lote_retornando("pedidos", linhas_pedido_para_banco)
+
                     if not pedidos_confirmados:
-                        st.error("Erro ao gerar IDs no banco de dados.")
+                        st.error("Erro crítico: O banco de dados não retornou as confirmações de pedido.")
                         st.stop()
 
-                    # --- ETAPA 2: USAR O UUID PARA MOVIMENTAÇÕES E PRODUÇÃO ---
-                    todas_mov = []
-                    todas_prod = []
+                    # --- ETAPA 5: VINCULAÇÃO TÉCNICA (UUID) E FINALIZAÇÃO DE PRODUÇÃO ---
+                    todas_movimentacoes_finais = []
+                    todas_ordens_producao = []
 
                     for i, pedido_db in enumerate(pedidos_confirmados):
-                        uuid_real = pedido_db['id_pedido'] 
-                        row_origem = df_editado.iloc[i]
-
-                        # Movimentações vinculadas ao UUID
-                        linhas_mov, erro = produtor.gerar_movimentacoes(
-                            id_pedido=uuid_real, 
-                            nome_produto=row_origem['produto'].upper(),
-                            quantidade=int(row_origem['qtd']),
-                            calculador=calc
-                        )
+                        uuid_tecnico = pedido_db['id_pedido'] 
                         
-                        if not erro:
-                            for m in linhas_mov:
-                                m['lote'] = id_p_smart
-                            todas_mov.extend(linhas_mov)
+                        # Atualiza as movimentações de estoque com o UUID técnico
+                        for mov in estoque_temporario[i]:
+                            mov['id_pedido'] = uuid_tecnico
+                            mov['lote'] = id_origem_smart 
+                        todas_movimentacoes_finais.extend(estoque_temporario[i])
 
-                        # Ordem de Produção: id_pedido (UUID) + id_origem (PED-...)
-                        ordem = produtor.gerar_ordem_producao(
-                            id_pedido=uuid_real, 
-                            nome_produto=row_origem['produto'],
-                            quantidade=int(row_origem['qtd']),
-                            data_entrega=data_sel.isoformat()
-                        )
-                        todas_prod.append({
-                            "id_pedido": uuid_real,   
-                            "id_origem": id_p_smart,     
-                            "data_producao": ordem[1],
-                            "produto": ordem[2],
-                            "quantidade": ordem[3],
-                            "data_entrega": ordem[4],
-                            "horario_entrega": horario_sel.strftime("%H:%M"),
-                            "status": ordem[5],
+                        todas_ordens_producao.append({
+                            "id_pedido": uuid_tecnico,      # Chave Estrangeira (Vínculo técnico)
+                            "id_origem": id_origem_smart,   # Chave de Origem (Vínculo visual/Barcode)
+                            "data_producao": data_sel.isoformat(),
+                            "produto": pedido_db['produto'],
+                            "quantidade": pedido_db['quantidade'],
+                            "data_entrega": pedido_db['data_entrega'],
+                            "horario_entrega": pedido_db['horario_entrega'],
+                            "status": "Pendente"
                         })
 
-                    # SALVAMENTO FINAL EM LOTE
-                    if todas_mov:
-                        db.salvar_movimentacoes_lote(todas_mov)
-                    if todas_prod:
-                        db.salvar_ordens_lote(todas_prod)
+                    # --- ETAPA 6: SALVAMENTO FINAL EM LOTE ---
+                    if todas_movimentacoes_finais:
+                        db.salvar_movimentacoes_lote(todas_movimentacoes_finais)
+                    
+                    if todas_ordens_producao:
+                        db.salvar_ordens_lote(todas_ordens_producao)
+
+                    # --- ETAPA 7: LIMPEZA DE INTERFACE E FEEDBACK ---
+                    st.session_state.carrinho = []
+                    st.session_state.pop("input_nome_cliente", None)
+                    st.success(f"✅ Pedido {id_origem_smart} finalizado com sucesso!")
+                    import time
+                    time.sleep(1.5)
+                    st.rerun()
 
                 except Exception as e:
-                    st.error(f"Erro ao processar: {e}")
+                    st.error(f"Ocorreu um erro no processamento: {str(e)}")
                     st.stop()
-
-                st.session_state.carrinho = []
-                st.success(f"✅ Pedido {id_p_smart} enviado com sucesso!")
-                import time
-                time.sleep(2)
-                st.rerun()
