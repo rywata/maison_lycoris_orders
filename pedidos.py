@@ -184,6 +184,8 @@ def renderizar_novo_pedido():
 
                         for mov in estoque_temporario[i]:
                             mov['lote'] = id_origem_smart
+                            mov['id_origem'] = id_origem_smart
+                            mov['id_pedido'] = uuid_tecnico
                         todas_movimentacoes_finais.extend(estoque_temporario[i])
 
                         todas_ordens_producao.append({

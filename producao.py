@@ -183,6 +183,10 @@ def renderizar_producao():
                         if erro:
                             st.error(erro)
                         else:
+                            for mov in linhas_mov:
+                                mov['id_origem'] = id_ref_final
+                                mov['id_pedido'] = id_ref_final
+
                             db.salvar_movimentacoes_lote(linhas_mov)
 
                             ordem = produtor.gerar_ordem_producao(
@@ -250,6 +254,8 @@ def _confirmar_producao(row, df_movimentacoes, df_receitas):
         )
 
         linha_mov['id_origem'] = str(row.get('id_origem', row.get('id_producao', '')))
+        linha_mov['id_pedido'] = str(row.get('id_pedido', ''))
+
 
         # Salva ENT-P no estoque
         ok_mov = db.salvar_movimentacao(linha_mov)
