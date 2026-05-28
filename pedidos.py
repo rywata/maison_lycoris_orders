@@ -87,10 +87,14 @@ def renderizar_novo_pedido():
             hide_index=True,
             key="editor_carrinho"
         )
-
-        if st.button("🔄 Recalcular Totais"):
-            st.session_state.carrinho = df_editado.to_dict('records')
-            st.rerun()
+        
+        itens_editados = df_editado.dropna(subset=['produto']).to_dict('records')
+        if itens_editados != st.session_state.carrinho:
+            st.session_state.carrinho = itens_editados
+    
+        for item in st.session_state.carrinho:
+            if 'qtd' in item and 'preco_unitario' in item:
+                item['subtotal'] = item['qtd'] * item['preco_unitario']
 
         meu_carrinho = Carrinho(df_editado.to_dict('records'), codigo_pasteis)
 
