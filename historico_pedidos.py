@@ -61,16 +61,17 @@ def renderizar_historico():
         )
 
         # Datas de entrega
-        datas_entrega_validas = df['data_entrega'].dropna()
-        if not datas_entrega_validas.empty:
-            entrega_min = datas_entrega_validas.min().date()
-            entrega_max = datas_entrega_validas.max().date()
+        hoje = date.today()
+        primeiro_dia_mes = hoje.replace(day=1)
+        
+        if hoje.month == 12:
+            ultimo_dia_mes = hoje.replace(year=hoje.year + 1, day=1) - pd.Timedelta(days=1)
         else:
-            entrega_min = entrega_max = date.today()
+            ultimo_dia_mes = hoje.replace(month=hoje.month + 1, day=1) - pd.Timedelta(days=1)
 
         intervalo_entrega = st.date_input(
             "Intervalo de Entrega",
-            value=(entrega_min, entrega_max)
+            value=(primeiro_dia_mes, ultimo_dia_mes)
         )
 
     # --- FILTROS ---
