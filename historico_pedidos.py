@@ -47,7 +47,7 @@ def renderizar_historico():
         produtos_disponiveis = ["Todos"] + sorted(df['produto'].dropna().unique().tolist())
         produto_sel = st.selectbox("Produto", produtos_disponiveis)
         
-        # Datas seguras
+        # Datas do pedido
         datas_validas = df['data_pedido'].dropna()
         if not datas_validas.empty:
             data_min_calc = datas_validas.min().date()
@@ -56,8 +56,21 @@ def renderizar_historico():
             data_min_calc = data_max_calc = date.today()
 
         intervalo = st.date_input(
-            "Intervalo de Datas", 
+            "Intervalo de Datas (Pedido)", 
             value=(data_min_calc, data_max_calc)
+        )
+
+        # Datas de entrega
+        datas_entrega_validas = df['data_entrega'].dropna()
+        if not datas_entrega_validas.empty:
+            entrega_min = datas_entrega_validas.min().date()
+            entrega_max = datas_entrega_validas.max().date()
+        else:
+            entrega_min = entrega_max = date.today()
+
+        intervalo_entrega = st.date_input(
+            "Intervalo de Entrega",
+            value=(entrega_min, entrega_max)
         )
 
     # --- FILTROS ---
@@ -81,6 +94,21 @@ def renderizar_historico():
             data_pedido_sem_tz.notna() &
             (data_pedido_sem_tz >= inicio) &
             (data_pedido_sem_tz < fim)
+        )
+
+    # --- FILTRO DE DATA DE ENTREGA ---
+    if isinstance(intervalo_entrega, (list, tuple)) and len(intervalo_entrega) == 2:
+        inicio_e, fim_e = intervalo_entrega
+
+        inicio_e = pd.to_datetime(inicio_e).replace(tzinfo=None)
+        fim_e = pd.to_datetime(fim_e).replace(tzinfo=None) + pd.Timedelta(days=1)
+
+        data_entrega_sem_tz = pd.to_datetime(df['data_entrega']).dt.tz_localize(None)
+
+        mask &= (
+            data_entrega_sem_tz.notna() &
+            (data_entrega_sem_tz >= inicio_e) &
+            (data_entrega_sem_tz < fim_e)
         )
 
     df_filtrado = df[mask]
