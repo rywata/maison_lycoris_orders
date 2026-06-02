@@ -37,6 +37,20 @@ def renderizar_historico():
 
     df = df_raw.copy()
 
+    df['data_pedido_na'] = pd.to_datetime(df['data_pedido']).dt.tz_localize(None)
+    df['data_entrega_na'] = pd.to_datetime(df['data_entrega']).dt.tz_localize(None)
+
+    hoje = date.today()
+    primeiro_dia_mes_atual = hoje.replace(day=1)
+
+    if hoje.month == 12:
+        ultimo_dia_mes_atual = hoje.replace(year=hoje.year + 1, month=1, day=1) - pd.Timedelta(days=1)
+    else:
+        ultimo_dia_mes_atual = hoje.replace(month=hoje.month + 1, day=1) - pd.Timedelta(days=1)
+    
+    ultimo_dia_mes_atual = ultimo_dia_mes_atual.date() if hasattr(ultimo_dia_mes_atual, 'date') else ultimo_dia_mes_atual
+
+
     # --- SIDEBAR ---
     with st.sidebar:
         st.header("🔍 Filtros")
@@ -57,21 +71,18 @@ def renderizar_historico():
 
         intervalo = st.date_input(
             "Intervalo de Datas (Pedido)", 
-            value=(data_min_calc, data_max_calc)
+            value=(primeiro_dia_mes_atual, ultimo_dia_mes_atual),
+            min_value=data_min_calc,
+            max_value=data_max_calc
         )
 
         # Datas de entrega
-        hoje = date.today()
-        primeiro_dia_mes = hoje.replace(day=1)
-        
-        if hoje.month == 12:
-            ultimo_dia_mes = hoje.replace(year=hoje.year + 1, day=1) - pd.Timedelta(days=1)
-        else:
-            ultimo_dia_mes = hoje.replace(month=hoje.month + 1, day=1) - pd.Timedelta(days=1)
 
         intervalo_entrega = st.date_input(
             "Intervalo de Entrega",
-            value=(primeiro_dia_mes, ultimo_dia_mes)
+            value=(primeiro_dia_mes_atual, ultimo_dia_mes_atual),
+            min_value=data_min_calc if not datas_validas.empty else None,
+            max_value=data_max_calc if not datas_validas.empty else None
         )
 
     # --- FILTROS ---
