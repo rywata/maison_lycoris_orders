@@ -48,13 +48,27 @@ def renderizar_historico():
     ultimo_dia_mes = ultimo_dia_mes.date() if hasattr(ultimo_dia_mes, 'date') else ultimo_dia_mes
 
     datas_pedido_validas = df['data_pedido'].dropna()
-    data_min_pedido = datas_pedido_validas.min().date() if not datas_pedido_validas.empty else hoje
-    data_max_pedido = datas_pedido_validas.max().date() if not datas_pedido_validas.empty else hoje
+    data_min_pedido = datas_pedido_validas.min().date() if not datas_pedido_validas.empty else primeiro_dia_mes
+    data_max_pedido = datas_pedido_validas.max().date() if not datas_pedido_validas.empty else ultimo_dia_mes
 
     datas_entrega_validas = df['data_entrega'].dropna()
-    data_min_entrega = datas_entrega_validas.min().date() if not datas_entrega_validas.empty else hoje
-    data_max_entrega = datas_entrega_validas.max().date() if not datas_entrega_validas.empty else hoje
+    data_min_entrega = datas_entrega_validas.min().date() if not datas_entrega_validas.empty else primeiro_dia_mes
+    data_max_entrega = datas_entrega_validas.max().date() if not datas_entrega_validas.empty else ultimo_dia_mes
 
+    # Ajuste do intervalo padrão para ficar dentro dos limites disponíveis
+    intervalo_padrao_inicio = max(primeiro_dia_mes, data_min_pedido)
+    intervalo_padrao_fim = min(ultimo_dia_mes, data_max_pedido)
+
+    if intervalo_padrao_inicio > intervalo_padrao_fim:
+        intervalo_padrao_inicio = data_min_pedido
+        intervalo_padrao_fim = data_max_pedido
+
+    intervalo_entrega_padrao_inicio = max(primeiro_dia_mes, data_min_entrega)
+    intervalo_entrega_padrao_fim = min(ultimo_dia_mes, data_max_entrega)
+
+    if intervalo_entrega_padrao_inicio > intervalo_entrega_padrao_fim:
+        intervalo_entrega_padrao_inicio = data_min_entrega
+        intervalo_entrega_padrao_fim = data_max_entrega
 
     # --- SIDEBAR ---
     with st.sidebar:
@@ -69,7 +83,7 @@ def renderizar_historico():
         # Datas do pedido
         intervalo = st.date_input(
             "Intervalo de Datas (Pedido)", 
-            value=(primeiro_dia_mes, ultimo_dia_mes),
+            value=(intervalo_padrao_inicio, intervalo_padrao_fim),
             min_value=data_min_pedido,
             max_value=data_max_pedido
         )
@@ -77,7 +91,7 @@ def renderizar_historico():
         # Datas de entrega
         intervalo_entrega = st.date_input(
             "Intervalo de Entrega",
-            value=(primeiro_dia_mes, ultimo_dia_mes),
+            value=(intervalo_entrega_padrao_inicio, intervalo_entrega_padrao_fim),
             min_value=data_min_entrega,
             max_value=data_max_entrega
         )
@@ -156,12 +170,19 @@ def renderizar_historico():
 
     # --- RESUMO ---
     with st.expander("📊 Resumo por Produto"):
-        resumo_prod = (
-            df_filtrado.groupby('produto')
-            .agg(
-                Qtd_Total=('quantidade', 'sum'),
-                Valor_Total=('total_liquido', 'sum')
+        if not df_filtrado.empty and 'produto' in df_filtrado.columns:    
+            resumo_prod = (
+                df_filtrado.groupby('produto')
+                .agg(
+                    Qtd_Total=('quantidade', 'sum'),
+                    Valor_Total=('total_liquido', 'sum')
+                )
+                .sort_values('Valor_Total', ascending=False)
             )
-            .sort_values('Valor_Total', ascending=False)
-        )
-        st.table(resumo_prod)
+            st.table(resumo_prod)
+        else:
+            st.info("Nenhum dado disponível para o resumo.")
+    
+    # Timestamp
+    with st.sidebar:
+        st.caption(f"Dados carregados em: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}")
