@@ -16,7 +16,7 @@ def renderizar_novo_pedido():
     cardapio = {
         "Pão de Leite": 15.0, "Pão Integral": 17.0, "Pão Semi Integral": 17.0, "Shokupan": 17.0,
         "Pastel de Nata": 7.0, "Pastel de Maçã": 7.0, "Pastel de Ricota com Ervas Finas": 7.0,
-        "Pastel de Frango com Parmesão": 7.0
+        "Pastel de Frango com Parmesão": 7.0, "Pastel de Amendoim": 7.0, "Croissant Amanteigado": 8.0
     }
     codigo_pasteis = [k for k in cardapio.keys() if "Pastel" in k]
 
