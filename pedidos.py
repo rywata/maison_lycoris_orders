@@ -17,6 +17,7 @@ def renderizar_novo_pedido():
         "Pão de Leite": 15.0,
         "Pão Integral": 17.0,
         "Pão Semi Integral": 17.0,
+        "Pão Australiano": 15.00,
         "Shokupan": 17.0,
         "Pastel de Nata": 7.0,
         "Pastel de Maçã": 7.0,
