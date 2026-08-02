@@ -21,8 +21,6 @@ def renderizar_novo_pedido():
         "Shokupan": 17.0,
         "Pastel de Nata": 7.0,
         "Pastel de Maçã": 7.0,
-        "Pastel de Ricota com Ervas Finas": 7.0,
-        "Pastel de Frango com Parmesão": 7.0,
         "Pastel de Amendoim": 7.0,
         "Croissant Amanteigado": 8.0,
         "Brownie": 8.0
