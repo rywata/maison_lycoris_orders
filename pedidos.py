@@ -17,12 +17,14 @@ def renderizar_novo_pedido():
         "Pão de Leite": 15.0,
         "Pão Integral": 17.0,
         "Pão Semi Integral": 17.0,
-        "Pão Australiano": 17.00,
+        "Pão Australiano": 17.0,
         "Shokupan": 17.0,
         "Pastel de Nata": 7.0,
         "Pastel de Maçã": 7.0,
         "Pastel de Amendoim": 7.0,
         "Croissant Amanteigado": 8.0,
+        "Panetone Grande": 36.0,
+        "Panetone Pequeno": 15.0,
         "Brownie": 12.0
     }
     codigo_pasteis = [k for k in cardapio.keys() if "Pastel" in k]
