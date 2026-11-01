@@ -6,6 +6,7 @@ import unicodedata
 
 fuso_brasil = pytz.timezone('America/Sao_Paulo')
 
+
 def normalizar(texto):
     texto = str(texto).strip().upper()
     return ''.join(
@@ -13,13 +14,13 @@ def normalizar(texto):
         if unicodedata.category(c) != 'Mn'
     )
 
+
 class GerenciadorProducao:
     def __init__(self, df_receitas, df_movimentacoes):
         self.receitas = df_receitas.copy()
         self.gerenciador_mov = GerenciadorMovimentacao(df_movimentacoes)
 
         if not self.receitas.empty:
-            # Normaliza colunas do Supabase (minúsculo) para o padrão esperado
             self.receitas.columns = self.receitas.columns.str.strip().str.lower()
             self.receitas = self.receitas.rename(columns={
                 'produto': 'Produto',
@@ -34,17 +35,16 @@ class GerenciadorProducao:
     def calcular_insumos(self, nome_produto, quantidade):
         if self.receitas.empty or 'Produto' not in self.receitas.columns:
             return None
-        mask = self.receitas['Produto'].str.upper() == nome_produto.upper()
+        alvo = normalizar(nome_produto)
+        mask = self.receitas['Produto'].apply(normalizar) == alvo
         receita = self.receitas[mask]
         if receita.empty:
             return None
-        rendimento = 1
 
-        fator_multiplicador = quantidade / rendimento
         return [
             {
                 'item': row['Item (Insumo)'],
-                'qtd': row['Qtd_Receita'] * fator_multiplicador,
+                'qtd': row['Qtd_Receita'] * quantidade,
                 'unidade': row['Unidade']
             }
             for _, row in receita.iterrows()
@@ -55,17 +55,13 @@ class GerenciadorProducao:
         if insumos is None:
             return None, f"Receita não encontrada para '{nome_produto}'"
 
-        # Validade = hoje + 4 dias
         validade_produto = (datetime.now(fuso_brasil) + timedelta(days=4)).strftime("%Y-%m-%d")
-
 
         linhas = []
         custo_total_producao = 0.0
 
         for insumo in insumos:
             custo_unit = calculador.custo_por_unidade(insumo['item']) if calculador else 0.0
-            if custo_unit is None:
-                custo_unit = 0.0
             custo_total_producao += custo_unit * insumo['qtd']
 
             linhas.append(self.gerenciador_mov.preparar_linha(
@@ -81,6 +77,7 @@ class GerenciadorProducao:
 
         custo_unitario_produto = custo_total_producao / quantidade if quantidade > 0 else 0.0
 
+        # Última linha = ENT-P (produto acabado)
         linhas.append(self.gerenciador_mov.preparar_linha(
             codigo="ENT-P",
             item=nome_produto,
@@ -97,12 +94,13 @@ class GerenciadorProducao:
     def gerar_ordem_producao(self, id_pedido, nome_produto, quantidade, data_entrega):
         return [
             id_pedido,                                                # [0]
-            datetime.now(fuso_brasil).strftime("%Y-%m-%d %H:%M:%S"), # [1]
+            datetime.now(fuso_brasil).strftime("%Y-%m-%d %H:%M:%S"),  # [1]
             nome_produto,                                             # [2]
             quantidade,                                               # [3]
             data_entrega,                                             # [4]
             "Pendente"                                                # [5]
         ]
+
 
 class GerenciadorStatusProducao:
     def __init__(self, df_producao, df_movimentacoes, calculador=None, df_receitas=None):
@@ -114,7 +112,6 @@ class GerenciadorStatusProducao:
     def confirmar_producao(self, id_producao, nome_produto, quantidade, data_entrega):
         hoje = date.today()
 
-        # Calcula custo unitário do produto acabado
         custo_unitario_produto = 0.0
         if self.calculador and self.df_receitas is not None:
             produtor_temp = GerenciadorProducao(self.df_receitas, pd.DataFrame())
@@ -124,8 +121,6 @@ class GerenciadorStatusProducao:
                 custo_unitario_produto = custo_total / quantidade if quantidade > 0 else 0.0
 
         validade_produto = (datetime.now(fuso_brasil) + timedelta(days=4)).strftime("%Y-%m-%d")
-
-
 
         linha_mov = self.gerenciador_mov.preparar_linha(
             codigo="ENT-P",
@@ -138,14 +133,18 @@ class GerenciadorStatusProducao:
             lote=f"Produção {id_producao}"
         )
 
-        if isinstance(data_entrega, str) and data_entrega:
+        # Trata data vazia, None, string com horário ou formato inválido
+        if isinstance(data_entrega, str):
             try:
-                data_entrega = date.fromisoformat(data_entrega)
+                data_entrega = date.fromisoformat(data_entrega[:10])
             except ValueError:
                 data_entrega = hoje
+        elif not data_entrega:
+            data_entrega = hoje
 
         novo_status = "Entregue" if data_entrega <= hoje else "Concluído"
         return linha_mov, novo_status
+
 
 class CalculadorCustos:
     def __init__(self, df_precos):
@@ -167,27 +166,23 @@ class CalculadorCustos:
             self.precos['Custo Unitário'] = self.precos['Preço'] / self.precos['Unidade']
             self._idx = self.precos.set_index('Item')
 
-            self.mapa_itens = {
-                normalizar(k): k for k in self._idx.index
-            }
+            self.mapa_itens = {normalizar(k): k for k in self._idx.index}
         else:
             self._idx = pd.DataFrame()
             self.mapa_itens = {}
 
     def custo_por_unidade(self, item):
-        item_norm = normalizar(item)
-        item_original = self.mapa_itens.get(item_norm)
+        """Retorna o custo por unidade de receita, ou 0.0 se não houver preço."""
+        item_original = self.mapa_itens.get(normalizar(item))
 
         try:
             if item_original and item_original in self._idx.index:
                 valor = self._idx.loc[item_original, 'Custo Unitário']
-
                 if isinstance(valor, pd.Series):
                     return float(valor.iloc[0])
                 return float(valor)
         except Exception as e:
             print(f"Erro ao buscar custo do item {item}: {e}")
-            return 0.0
 
         return 0.0
 
@@ -198,7 +193,7 @@ class CalculadorCustos:
         for insumo in insumos:
             custo_unit = self.custo_por_unidade(insumo['item'])
 
-            if custo_unit is None:
+            if not custo_unit:
                 custo_total_insumo = 0.0
                 obs = "⚠️ Preço não cadastrado"
                 custo_unit_exibir = 0.0
@@ -220,33 +215,37 @@ class CalculadorCustos:
 
         return pd.DataFrame(linhas), custo_total_geral
 
+
 class AnalisadorProducao:
     def __init__(self, df_producao):
         self.df = df_producao.copy() if not df_producao.empty else pd.DataFrame()
 
         if not self.df.empty:
-            self.df.columns = self.df.columns.str.strip()
-            self.df['Data Produção'] = pd.to_datetime(self.df['Data Produção'], errors='coerce')
-            self.df['Quantidade'] = pd.to_numeric(self.df['Quantidade'], errors='coerce').fillna(0)
+            self.df.columns = self.df.columns.str.strip().str.lower()
+            self.df['data_producao'] = pd.to_datetime(self.df['data_producao'], errors='coerce')
+            self.df['quantidade'] = pd.to_numeric(self.df['quantidade'], errors='coerce').fillna(0)
 
     @property
     def producao_por_produto(self):
         if self.df.empty:
             return pd.DataFrame()
         return (
-            self.df.groupby('Produto')['Quantidade']
-            .sum()
-            .reset_index()
-            .sort_values('Quantidade', ascending=False)
+            self.df.groupby('produto')['quantidade']
+            .sum().reset_index()
+            .sort_values('quantidade', ascending=False)
         )
 
     def filtrar_por_periodo(self, data_inicio=None, data_fim=None):
         temp = self.df.copy()
+        if temp.empty:
+            return temp
         if data_inicio:
-            temp = temp[temp['Data Produção'] >= pd.Timestamp(data_inicio)]
+            temp = temp[temp['data_producao'].dt.date >= data_inicio]
         if data_fim:
-            temp = temp[temp['Data Produção'] <= pd.Timestamp(data_fim)]
+            temp = temp[temp['data_producao'].dt.date <= data_fim]
         return temp
 
     def filtrar_por_pedido(self, id_pedido):
-        return self.df[self.df['ID Pedido'] == id_pedido]
+        if self.df.empty:
+            return self.df
+        return self.df[self.df['id_pedido'] == id_pedido]
