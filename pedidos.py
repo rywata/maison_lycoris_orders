@@ -230,5 +230,7 @@ def renderizar_novo_pedido():
                     st.rerun()
 
                 except Exception as e:
-                    st.error(f"Ocorreu um erro no processamento: {str(e)}")
+                    import traceback
+                    st.error(f"Ocorreu um erro no processamento: {e}")
+                    st.code(traceback.format_exc())
                     st.stop()
