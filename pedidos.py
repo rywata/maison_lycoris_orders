@@ -156,6 +156,9 @@ def renderizar_novo_pedido():
                             quantidade=int(row['qtd']),
                             calculador=calc
                         )
+                        if erro or not linhas_mov:
+                            st.warning(f"⚠️ {row['produto']}: {erro}")
+                            linhas_mov = []
                         
                         # Extração do custo total da linha
                         custo_unit_calc = float(linhas_mov[-1]['custo_unitario']) if not erro and linhas_mov else 0.0
