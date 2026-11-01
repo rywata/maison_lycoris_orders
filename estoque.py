@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from database import Database
-from logic_estoque import GerenciadorMovimentacao as GestorRegras
+from logic_estoque import GestorRegras
 from datetime import datetime
 import pytz
 
@@ -107,9 +107,8 @@ def renderizar_estoque():
                 df_filtrado['item'].str.contains(filtro_item, case=False, na=False)
             ]
         if filtro_data and not df_filtrado.empty:
-            df_filtrado = df_filtrado[
-                pd.to_datetime(df_filtrado['data_mov']) >= pd.Timestamp(filtro_data)
-            ]
+            datas = pd.to_datetime(df_filtrado['data_mov'], errors='coerce').dt.tz_localize(None)
+            df_filtrado = df_filtrado[datas >= pd.Timestamp(filtro_data)]
 
         st.metric("Registros encontrados", len(df_filtrado))
 
@@ -216,6 +215,7 @@ def renderizar_estoque():
                     diferenca = qtd_contada - saldo_atual
                     if diferenca == 0:
                         st.warning("Quantidade igual ao saldo. Nenhum ajuste necessário.")
+                        st.stop()
                     else:
                         codigo = "ENT-A" if diferenca > 0 else "SAI-A"
                         qtd_final = abs(diferenca)

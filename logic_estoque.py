@@ -102,4 +102,24 @@ class BuscaEstoque:
         resumo['saldo_periodo'] = resumo['entradas'] - resumo['saidas']
         return resumo
 
-GestorRegras = GerenciadorMovimentacao
+class GestorRegras:
+    def __init__(self, df_cadastro):
+        self.regras = {}
+        if df_cadastro is not None and not df_cadastro.empty:
+            df = df_cadastro.copy()
+            df.columns = [c.strip().lower() for c in df.columns]
+            df['fator_conversao'] = pd.to_numeric(df['fator_conversao'], errors='coerce').fillna(1)
+            df['estoque_minimo'] = pd.to_numeric(df['estoque_minimo'], errors='coerce').fillna(0)
+            self.regras = df.set_index('item').to_dict('index')
+
+    def obter_unidade_compra(self, item):
+        return self.regras.get(item, {}).get('unidade_compra', '')
+
+    def obter_unidade_receita(self, item):
+        return self.regras.get(item, {}).get('unidade_receita', '')
+
+    def obter_fator(self, item):
+        return self.regras.get(item, {}).get('fator_conversao', 1)
+
+    def obter_minimo(self, item):
+        return self.regras.get(item, {}).get('estoque_minimo', 0)
