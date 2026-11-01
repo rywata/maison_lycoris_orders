@@ -107,7 +107,9 @@ def renderizar_novo_pedido():
             if 'qtd' in item and 'preco_unitario' in item:
                 item['subtotal'] = item['qtd'] * item['preco_unitario']
 
-        meu_carrinho = Carrinho(df_editado.to_dict('records'), codigo_pasteis)
+        df_final = df_editado.dropna(subset=['produto', 'qtd'])   
+
+        meu_carrinho = Carrinho(df_final.to_dict('records'), codigo_pasteis)   
 
         c1, c2 = st.columns(2)
         with c1:
@@ -126,7 +128,13 @@ def renderizar_novo_pedido():
 
         with col_enviar:
             if st.button("🚀 FINALIZAR E ENVIAR", type="primary", use_container_width=True):
-                
+                if not nome_cliente.strip():
+                    st.error("Informe o nome do cliente.")
+                    st.stop()
+
+                if df_final.empty:
+                    st.error("O pedido não tem itens.")
+                    st.stop()
                 # --- ETAPA 1: GERAÇÃO DO IDENTIFICADOR DE NEGÓCIO (SMART ID) ---
                 # ID que será usado no Código de Barras.
                 data_slug = datetime.now(fuso_brasil).strftime("%Y%m")
@@ -152,7 +160,7 @@ def renderizar_novo_pedido():
                     for _, row in df_editado.iterrows():
                         linhas_mov, erro = produtor.gerar_movimentacoes(
                             id_pedido=id_origem_smart, 
-                            nome_produto=row['produto'].upper(),
+                            nome_produto=row['produto'],
                             quantidade=int(row['qtd']),
                             calculador=calc
                         )
@@ -186,25 +194,27 @@ def renderizar_novo_pedido():
                         
                         estoque_temporario.append(linhas_mov)
 
-                    # --- ETAPA 4: PERSISTÊNCIA DO PEDIDO E CAPTURA DE UUIDs ---
+                    # --- ETAPA 4 ---
                     pedidos_confirmados = db.inserir_lote_retornando("pedidos", linhas_pedido_para_banco)
 
-                    if not pedidos_confirmados:
-                        st.error("Erro crítico: O banco de dados não retornou as confirmações de pedido.")
+                    if len(pedidos_confirmados) != len(linhas_pedido_para_banco):
+                        st.error("O banco não confirmou todas as linhas do pedido. Verifique a mensagem de erro acima.")
                         st.stop()
 
-                    # --- ETAPA 5: VINCULAÇÃO TÉCNICA (UUID) E FINALIZAÇÃO DE PRODUÇÃO ---
+                    # --- ETAPA 5 ---
                     todas_movimentacoes_finais = []
                     todas_ordens_producao = []
 
-                    for i, pedido_db in enumerate(pedidos_confirmados):
+                    for pedido_db, movs in zip(pedidos_confirmados, estoque_temporario):
                         uuid_tecnico = pedido_db['id_pedido']
 
-                        for mov in estoque_temporario[i]:
+                        # Só a baixa de insumos (SAI-P). O ENT-P entra ao concluir a produção.
+                        saidas = [m for m in movs if m['tipo'] == 'SAI-P']
+                        for mov in saidas:
                             mov['lote'] = id_origem_smart
                             mov['id_origem'] = id_origem_smart
                             mov['id_pedido'] = uuid_tecnico
-                        todas_movimentacoes_finais.extend(estoque_temporario[i])
+                        todas_movimentacoes_finais.extend(saidas)
 
                         todas_ordens_producao.append({
                             "id_pedido": uuid_tecnico,
