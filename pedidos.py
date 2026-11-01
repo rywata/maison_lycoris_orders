@@ -23,8 +23,10 @@ def renderizar_novo_pedido():
         "Pastel de Maçã": 7.0,
         "Pastel de Amendoim": 7.0,
         "Croissant Amanteigado": 8.0,
-        "Panetone Grande": 36.0,
-        "Panetone Pequeno": 15.0,
+        "Panetone Grande de Frutas": 38.0,
+        "Panetone Pequeno de Frutas": 15.0,
+        "Panetone Grande de Chocolate": 38.0,
+        "Panetone Pequeno de Chocolate": 15.0,
         "Brownie": 12.0
     }
     codigo_pasteis = [k for k in cardapio.keys() if "Pastel" in k]
