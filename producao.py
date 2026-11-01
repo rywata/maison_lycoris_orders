@@ -149,6 +149,7 @@ def renderizar_producao():
             id_ref = st.text_input("Referência (opcional)", placeholder="Ex: Fornada extra",
                                     key="ref_prod_manual")
         # Preview de custo via SQL
+        total = 0.0
         db = Database()
         df_custo = db.custo_receita(produto, quantidade)
         if not df_custo.empty:
